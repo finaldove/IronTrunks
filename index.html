@@ -181,7 +181,7 @@
 /* ============================== DATA ============================== */
 const TARGETS = { p:190, c:250, f:70, s:60, sa:27, k:2400 };
 const MEALS = ["Breakfast","Lunch","Dinner","Snack"];
-const FOOD_GROUPS = ["Protein","Carb","Veg & Fruit","Fat & Nuts","Dairy","Sauce"];
+const FOOD_GROUPS = ["Protein","Carb","Veg & Fruit","Fat & Nuts","Dairy","Konbini & Prepared","Snacks & Sweets","Drinks","Sauce"];
 const FOODS = [
   ["Chicken breast","Protein","g",100,23,0,1.5,0,0.4,108],["Chicken tender","Protein","g",100,23,0,0.8,0,0.2,98],
   ["Chicken thigh","Protein","g",100,19,0,5,0,1.4,127],["Beef round","Protein","g",100,21,0.5,10,0,3.8,182],
@@ -202,10 +202,195 @@ const FOODS = [
   ["Cheese slice","Dairy","slice",1,4,0.3,4.7,0.2,3,60],["Ketchup","Sauce","tbsp",1,0.2,4,0,3.5,0,18],
   ["Mayonnaise","Sauce","tbsp",1,0.3,0.4,8.3,0.1,0.9,75],["Soy sauce","Sauce","tbsp",1,1.4,1.8,0,0.1,0,13],
   ["Yakiniku sauce","Sauce","tbsp",1,0.5,6,0.1,5,0,30],
+
+  /* ---- Japanese additions ---- */
+  /* Protein — fish, soy, surimi, chicken */
+  ["Saba (mackerel)","Protein","g",100,20.6,0.3,12.8,0,3.4,211],["Tuna sashimi (lean)","Protein","g",100,26,0.1,1.4,0,0.4,115],
+  ["Tuna (fatty/toro)","Protein","g",100,20,0.1,27.5,0,6,344],["Shrimp","Protein","g",100,19,0.1,0.3,0,0.1,82],
+  ["Squid","Protein","g",100,18,0.1,0.8,0,0.2,80],["Shirasu (whitebait)","Protein","g",100,17.6,0.1,1.7,0,0.4,84],
+  ["Mentaiko","Protein","g",30,6.3,1,1,0,0.3,36],["Ikura (salmon roe)","Protein","g",30,9.8,0.1,4.7,0,1,76],
+  ["Silken tofu","Protein","g",100,5.3,2,3.5,0.5,0.6,56],["Atsuage (fried tofu)","Protein","g",100,10.7,0.9,11.3,0,1.7,143],
+  ["Aburaage","Protein","piece",1,6.9,0,10.3,0,1.5,113],["Edamame (boiled)","Protein","g",100,11.5,8.9,6.1,1.4,0.8,118],
+  ["Chikuwa","Protein","piece",1,3.7,4,0.6,1,0.1,36],["Kamaboko","Protein","g",100,12,9.7,0.9,0,0.3,93],
+  ["Satsuma-age","Protein","piece",1,4.5,4.5,1.5,1,0.4,55],["Hanpen","Protein","g",100,9.9,11.4,1,0,0.2,94],
+  ["Salad chicken (konbini)","Protein","piece",1,25,1,1.5,0,0.4,115],["Chicken mince","Protein","g",100,17.5,0,12,0,3.3,171],
+  ["Beef (fatty, sliced)","Protein","g",100,14.4,0.3,33,0,12,338],
+
+  /* Carb — rice, noodles, mochi, imo */
+  ["Cooked white rice","Carb","g",100,2.5,37,0.3,0,0.1,156],["Cooked brown rice","Carb","g",100,2.8,35.6,1,0,0.2,165],
+  ["Rice (1 bowl ~150g)","Carb","bowl",1,3.8,55.5,0.5,0,0.2,234],["Mochi","Carb","piece",1,2,25.4,0.3,0,0.1,112],
+  ["Udon (boiled)","Carb","g",100,2.6,21.6,0.4,0,0.1,95],["Soba (boiled)","Carb","g",100,4.8,26,1,0,0.2,130],
+  ["Somen (boiled)","Carb","g",100,3.5,25.8,0.4,0,0.1,114],["Ramen noodles (fresh, boiled)","Carb","g",100,4.9,27.9,1.6,0,0.4,149],
+  ["Satoimo (taro)","Carb","g",100,1.5,13.1,0.1,0,0,53],["Corn","Carb","g",100,3.6,16.8,1.7,3,0.3,89],
+
+  /* Veg & Fruit + seaweed */
+  ["Daikon","Veg & Fruit","g",100,0.5,4.1,0.1,2.7,0,15],["Carrot","Veg & Fruit","g",100,0.7,9.3,0.2,5.9,0,35],
+  ["Negi (green onion)","Veg & Fruit","g",100,1.4,8.3,0.1,0,0,34],["Komatsuna","Veg & Fruit","g",100,1.5,2.4,0.2,0.5,0,13],
+  ["Bean sprouts (moyashi)","Veg & Fruit","g",100,1.7,2.6,0.1,0,0,15],["Nasu (eggplant)","Veg & Fruit","g",100,1.1,5.1,0.1,2.6,0,18],
+  ["Kabocha (squash)","Veg & Fruit","g",100,1.9,20.6,0.3,8.5,0,78],["Cucumber","Veg & Fruit","g",100,1,3,0.1,1.9,0,13],
+  ["Tomato","Veg & Fruit","g",100,0.7,4.7,0.1,3.7,0,20],["Piman (green pepper)","Veg & Fruit","g",100,0.9,5.1,0.2,2.3,0,20],
+  ["Hakusai (chinese cabbage)","Veg & Fruit","g",100,0.8,3.2,0.1,1.9,0,13],["Renkon (lotus root)","Veg & Fruit","g",100,1.9,15.5,0.1,0,0,66],
+  ["Gobo (burdock)","Veg & Fruit","g",100,1.8,15.4,0.1,0,0,58],["Nori (seaweed)","Veg & Fruit","sheet",1,1.2,1.2,0.1,0,0,6],
+  ["Wakame (rehydrated)","Veg & Fruit","g",100,1.5,4,0.2,0,0,16],["Hijiki (cooked)","Veg & Fruit","g",100,1,5,0.3,0,0,30],
+  ["Mikan","Veg & Fruit","piece",1,0.5,9,0.1,8,0,37],["Apple","Veg & Fruit","piece",1,0.2,29,0.3,24,0,110],
+  ["Kaki (persimmon)","Veg & Fruit","piece",1,0.6,23,0.3,20,0,90],["Nashi (pear)","Veg & Fruit","piece",1,0.5,29,0.3,22,0,110],
+  ["Grapes","Veg & Fruit","g",100,0.4,15.2,0.1,15,0,59],["Strawberry","Veg & Fruit","g",100,0.9,8.5,0.1,7,0,31],
+
+  /* Fat & Nuts */
+  ["Sesame oil","Fat & Nuts","tbsp",1,0,0,12,0,1.8,108],["Sesame seeds","Fat & Nuts","tbsp",1,1.8,1.6,4.9,0,0.7,54],
+  ["Avocado","Fat & Nuts","piece",1,2.5,6,18.7,0.5,3,187],["Walnuts","Fat & Nuts","g",30,4.4,3.5,20.6,0.8,1.9,201],
+  ["Peanuts","Fat & Nuts","g",30,7.5,5.6,14.7,1.2,2.7,170],["Mixed nuts","Fat & Nuts","g",30,5.5,5,17,1.5,2,190],
+  ["Butter","Fat & Nuts","tbsp",1,0.1,0,11.5,0,7,100],
+
+  /* Dairy & soy milk */
+  ["Soy milk (unsweetened)","Dairy","ml",200,7.2,6,4,2.9,0.6,92],["Yogurt (plain)","Dairy","g",100,3.6,4.9,3,4.9,1.8,56],
+  ["Low-fat milk","Dairy","ml",200,7,9.8,2,9.8,1.2,92],["Cream cheese","Dairy","g",30,2.5,0.7,9.9,0.6,6,99],
+  ["Pizza cheese (shredded)","Dairy","g",30,7,0.4,7.8,0.1,5,103],
+
+  /* Konbini & prepared */
+  ["Onigiri (salmon)","Konbini & Prepared","piece",1,5,40,1.5,0,0.4,190],["Onigiri (tuna mayo)","Konbini & Prepared","piece",1,5,39,5,0,1,230],
+  ["Onigiri (umeboshi)","Konbini & Prepared","piece",1,3,40,0.5,0,0.1,170],["Onigiri (plain/salt)","Konbini & Prepared","piece",1,2.6,39,0.5,0,0.1,170],
+  ["Tamagoyaki","Konbini & Prepared","serving",1,6.5,3,7,2,2,103],["Korokke (potato)","Konbini & Prepared","piece",1,3,25,9,2,1.5,190],
+  ["Karaage (fried chicken)","Konbini & Prepared","piece",1,5,3,4.5,0,0.9,73],["Chicken katsu","Konbini & Prepared","g",100,15,12,15,0,2.5,240],
+  ["Yakitori (1 skewer)","Konbini & Prepared","skewer",1,7,1.5,4.5,0.5,1.2,75],["Oden egg","Konbini & Prepared","piece",1,6.2,0.2,5.2,0.2,1.6,71],
+  ["Oden daikon","Konbini & Prepared","piece",1,0.4,3,0.1,2,0,15],["Miso soup (1 bowl)","Konbini & Prepared","bowl",1,2.2,3,1,1,0.2,40],
+  ["Instant ramen (1 pack)","Konbini & Prepared","pack",1,9,60,18,3,8,450],["Cup noodle","Konbini & Prepared","cup",1,8.5,44,15,5,7,350],
+  ["Konbini salad (chicken)","Konbini & Prepared","pack",1,12,8,6,4,1.2,130],["Egg sando (konbini)","Konbini & Prepared","pack",1,11,26,18,4,4,300],
+
+  /* Snacks & sweets */
+  ["Senbei (rice cracker)","Snacks & Sweets","piece",1,0.8,8,0.3,1,0.1,37],["Pocky (~half pack)","Snacks & Sweets","serving",1,2,12,3,7,2,80],
+  ["Dorayaki","Snacks & Sweets","piece",1,5,40,2,25,0.5,200],["Daifuku (mochi)","Snacks & Sweets","piece",1,2,25,0.3,12,0.1,115],
+  ["Anpan","Snacks & Sweets","piece",1,6.5,47,3,20,1,250],["Melonpan","Snacks & Sweets","piece",1,8,60,12,18,5,380],
+  ["Castella (1 slice)","Snacks & Sweets","slice",1,3.5,25,2,18,0.7,140],["Dango (1 skewer)","Snacks & Sweets","skewer",1,2,28,0.3,12,0.1,120],
+  ["Taiyaki","Snacks & Sweets","piece",1,5,45,2,22,0.5,210],["Pudding (purin)","Snacks & Sweets","cup",1,4.5,20,5,18,2.5,140],
+  ["Ice cream (cup)","Snacks & Sweets","cup",1,3.5,23,8,20,5,180],["Chocolate (25g)","Snacks & Sweets","g",25,1.4,13,8.6,12,5,140],
+  ["Calorie Mate (2 bars)","Snacks & Sweets","serving",1,4.2,20,11,9,5,200],["SOYJOY (1 bar)","Snacks & Sweets","bar",1,4,12,8,5,3,130],
+
+  /* Drinks */
+  ["Green tea","Drinks","ml",200,0,0,0,0,0,4],["Barley tea (mugicha)","Drinks","ml",200,0,0,0,0,0,2],
+  ["Oolong tea","Drinks","ml",200,0,0,0,0,0,0],["Black coffee","Drinks","ml",200,0.4,1.4,0,0,0,8],
+  ["Cafe au lait","Drinks","ml",200,3.5,11,4,11,2.5,90],["Pocari Sweat","Drinks","ml",500,0,31,0,31,0,125],
+  ["Calpis (diluted)","Drinks","ml",200,1.5,18,0.2,18,0.1,80],["Cola","Drinks","ml",500,0,57,0,57,0,225],
+  ["Orange juice","Drinks","ml",200,1.4,21,0.2,20,0,90],["Beer (350ml)","Drinks","can",1,1.1,10.9,0,0,0,140],
+  ["Amazake","Drinks","ml",200,1.6,18,0.1,16,0,76],
+
+  /* Sauce & seasoning */
+  ["Miso","Sauce","tbsp",1,2.2,3.4,0.9,1,0.2,35],["Mirin","Sauce","tbsp",1,0.1,7.8,0,7.8,0,43],
+  ["Ponzu","Sauce","tbsp",1,0.5,2,0,1.5,0,12],["Mentsuyu (diluted)","Sauce","tbsp",1,0.4,2.5,0,1.5,0,12],
+  ["Tonkatsu sauce","Sauce","tbsp",1,0.2,5,0,4,0,21],["Okonomiyaki sauce","Sauce","tbsp",1,0.2,6,0,5,0,24],
+  ["Oyster sauce","Sauce","tbsp",1,1.1,4,0,2,0,20],["Dashi (stock)","Sauce","ml",200,0.6,0.6,0,0,0,5],
+  ["Rice vinegar","Sauce","tbsp",1,0,0.5,0,0,0,7],["Sriracha","Sauce","tbsp",1,0.3,3,0.2,2,0,15],
+  ["Curry roux (1 block)","Sauce","block",1,1.3,9,6,1,3,103],["Honey","Sauce","tbsp",1,0,17,0,16,0,65],
+  ["Sugar","Sauce","tsp",1,0,4,0,4,0,16],
 ].map(a => ({ n:a[0], g:a[1], u:a[2], q:a[3], p:a[4], c:a[5], f:a[6], s:a[7], sa:a[8], k:a[9] }));
 const FOOD_BY_NAME = Object.fromEntries(FOODS.map(x => [x.n, x]));
 function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:"serving", q:1, p:cf.p, c:cf.c, f:cf.f, s:cf.s, sa:cf.sa, k:cf.k, custom:true, id:cf.id }; }
 function resolveFood(name){ if(FOOD_BY_NAME[name]) return FOOD_BY_NAME[name]; for(var i=0;i<state.customFoods.length;i++){ if(state.customFoods[i].n===name) return customAsFood(state.customFoods[i]); } return null; }
+
+/* ---------- offline meal parser ---------- */
+const NUMW={a:1,an:1,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,half:0.5,couple:2,few:3};
+const ALIAS=[
+  ["brown rice","Cooked brown rice"],["white rice","Cooked white rice"],["fried rice","Cooked white rice"],
+  ["bowl rice","Rice (1 bowl ~150g)"],["rice bowl","Rice (1 bowl ~150g)"],["gohan","Cooked white rice"],["rice","Cooked white rice"],
+  ["chicken breast","Chicken breast"],["chicken thigh","Chicken thigh"],["salad chicken","Salad chicken (konbini)"],["fried chicken","Karaage (fried chicken)"],["karaage","Karaage (fried chicken)"],["chicken","Chicken breast"],
+  ["greek yogurt","Greek yogurt"],["greek yoghurt","Greek yogurt"],["yogurt","Yogurt (plain)"],["yoghurt","Yogurt (plain)"],
+  ["silken tofu","Silken tofu"],["firm tofu","Firm tofu"],["tofu","Firm tofu"],
+  ["peanut butter","Peanut butter"],["whey protein","Whey protein"],["protein shake","Whey protein"],["protein powder","Whey protein"],["whey","Whey protein"],["protein bar","Protein bar"],
+  ["soy milk","Soy milk (unsweetened)"],["milk","Milk"],
+  ["oatmeal","Oats (dry)"],["porridge","Oats (dry)"],["oats","Oats (dry)"],
+  ["miso soup","Miso soup (1 bowl)"],["green tea","Green tea"],["black coffee","Black coffee"],["coffee","Black coffee"],
+  ["mackerel","Saba (mackerel)"],["saba","Saba (mackerel)"],["salmon","Salmon"],["tuna","Tuna (can)"],
+  ["edamame","Edamame (boiled)"],["natto","Natto"],
+  ["udon","Udon (boiled)"],["soba","Soba (boiled)"],["somen","Somen (boiled)"],["ramen","Ramen noodles (fresh, boiled)"],
+  ["bread","Bread"],["toast","Bread"],["shokupan","Bread"],["banana","Banana"],["apple","Apple"],["mikan","Mikan"],
+  ["almonds","Almonds"],["almond","Almonds"],["avocado","Avocado"],["cheese","Cheese slice"],["egg","Egg"],["eggs","Egg"],["tamago","Egg"],
+  ["onigiri","Onigiri (plain/salt)"],["mochi","Mochi"],["beer","Beer (350ml)"],["broccoli","Broccoli"],["spinach","Spinach"],["cabbage","Cabbage"],
+  ["鮭","Salmon"],["卵","Egg"],["ご飯","Cooked white rice"],["白米","Cooked white rice"],["米","Cooked white rice"],["鶏むね","Chicken breast"],["鶏胸","Chicken breast"],["鶏","Chicken breast"],["納豆","Natto"],["豆腐","Firm tofu"],["バナナ","Banana"],["牛乳","Milk"],["鯖","Saba (mackerel)"],["枝豆","Edamame (boiled)"],["うどん","Udon (boiled)"],["そば","Soba (boiled)"],["餅","Mochi"],["ヨーグルト","Greek yogurt"],["豆乳","Soy milk (unsweetened)"]
+].sort((a,b)=> (b[0].split(" ").length-a[0].split(" ").length) || (b[0].length-a[0].length));
+function kwOf(name){ return name.toLowerCase().replace(/\([^)]*\)/g," ").replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>1); }
+const FOOD_KW=FOODS.map(f=>({n:f.n,kw:kwOf(f.n)}));
+function canonUnit(u){ u=u.toLowerCase();
+  if(/^(grams?|grammes?|g)$/.test(u))return"g"; if(u==="kg")return"kg"; if(u==="ml")return"ml"; if(/^(l|litres?|liters?)$/.test(u))return"l";
+  if(/^(tbsp|tablespoons?)$/.test(u))return"tbsp"; if(/^(tsp|teaspoons?)$/.test(u))return"tsp";
+  if(/^(cups?)$/.test(u))return"cup"; if(/^(bowls?)$/.test(u))return"bowl"; if(/^(cans?)$/.test(u))return"can";
+  if(/^(packs?|packets?)$/.test(u))return"pack"; if(/^(bottles?)$/.test(u))return"bottle"; if(/^(scoops?)$/.test(u))return"scoop";
+  if(/^(bars?)$/.test(u))return"bar"; if(/^(slices?)$/.test(u))return"slice"; if(/^(pieces?|pcs?)$/.test(u))return"piece";
+  if(/^(skewers?)$/.test(u))return"skewer"; if(/^(sheets?)$/.test(u))return"sheet"; if(/^(blocks?)$/.test(u))return"block";
+  if(/^(handfuls?)$/.test(u))return"handful"; return u; }
+function parseSeg(seg){
+  let s=" "+seg.toLowerCase()+" ";
+  s=s.replace(/グラム/g," g ").replace(/個/g," piece ").replace(/枚/g," slice ").replace(/杯/g," bowl ").replace(/本/g," skewer ").replace(/パック/g," pack ").replace(/切れ/g," slice ");
+  let qty=null, unit=null;
+  let m=s.match(/(\d+(?:\.\d+)?)\s*(grams?|grammes?|kg|ml|litres?|liters?|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|bowls?|cans?|packs?|packets?|bottles?|scoops?|bars?|slices?|pieces?|pcs?|skewers?|sheets?|blocks?|handfuls?|g)\b/);
+  if(m){ qty=parseFloat(m[1]); unit=canonUnit(m[2]); s=s.replace(m[0]," "); }
+  if(qty===null){ let mn=s.match(/\s(\d+(?:\.\d+)?|a|an|one|two|three|four|five|six|seven|eight|nine|ten|half|couple|few)\s/);
+    if(mn){ const w=mn[1]; qty=(NUMW[w]!==undefined)?NUMW[w]:parseFloat(w); s=s.replace(mn[0]," "); } }
+  let foodText=s.replace(/\b(of|a|an|some|with|the|i|had|ate|eaten|eat|my|about|approx|approximately|around|plus|and|then|also)\b/g," ").replace(/[^a-z0-9\u3000-\u9fff ]/g," ").replace(/\s+/g," ").trim();
+  return { qty, unit, foodText };
+}
+function aliasMatch(foodText){
+  const toks=foodText.split(" ").filter(Boolean);
+  for(let i=0;i<ALIAS.length;i++){ const phrase=ALIAS[i][0], name=ALIAS[i][1];
+    if(/[a-z]/.test(phrase)){ const pw=phrase.split(" ");
+      for(let j=0;j+pw.length<=toks.length;j++){ let ok=true; for(let k=0;k<pw.length;k++){ if(toks[j+k]!==pw[k]){ok=false;break;} } if(ok) return name; }
+    } else { if(foodText.indexOf(phrase)>=0) return name; } }
+  return null;
+}
+function matchFood(foodText){
+  if(!foodText) return null;
+  const a=aliasMatch(foodText); if(a) return a;
+  const tset=new Set(foodText.split(" ").filter(Boolean));
+  let best=null, bestScore=0;
+  const pool=FOOD_KW.concat(state.customFoods.map(cf=>({n:cf.n,kw:kwOf(cf.n)})));
+  for(let i=0;i<pool.length;i++){ const f=pool[i]; if(!f.kw.length) continue;
+    let m=0; for(let j=0;j<f.kw.length;j++){ if(tset.has(f.kw[j])) m++; }
+    if(!m) continue; const score=m+(m/f.kw.length); if(score>bestScore){ bestScore=score; best=f.n; } }
+  return best;
+}
+function resolveAmount(food, qty, unit){
+  let q=(qty==null||isNaN(qty))?1:qty;
+  if(unit==="kg") return (food.u==="g")?q*1000:q;
+  if(unit==="g"||unit==="ml") return (food.u==="g"||food.u==="ml")?q:1;
+  if(food.u==="g"||food.u==="ml") return q*food.q;
+  return q;
+}
+function parseMealText(text){
+  if(!text||!text.trim()) return [];
+  const segs=text.replace(/\r?\n/g,",").split(/,|;|\band\b|\+|、|・/).map(s=>s.trim()).filter(Boolean);
+  const out=[];
+  for(let i=0;i<segs.length;i++){ const ps=parseSeg(segs[i]); if(!ps) continue;
+    const foodName=matchFood(ps.foodText); const fo=foodName?resolveFood(foodName):null;
+    const amount=fo?resolveAmount(fo,ps.qty,ps.unit):(ps.qty||1);
+    out.push({ id:uid(), raw:segs[i], foodName:foodName, amount:amount }); }
+  return out;
+}
+function quickAddCard(){
+  let review="";
+  if(state.parsed && state.parsed.length){
+    review='<div class="stack-sm" style="margin-top:10px">'+state.parsed.map(it=>{
+      const fo=it.foodName?resolveFood(it.foodName):null;
+      if(!fo){ return '<div class="item" style="border-left-color:var(--muted)"><div class="min0"><div class="truncate" style="font-weight:600;font-size:13px;color:var(--muted)">“'+esc(it.raw)+'”</div><div class="note-muted">no match — remove, or add it manually below</div></div><button class="x" onclick="App.removeParsed(\''+it.id+'\')">×</button></div>'; }
+      const fac=it.amount/fo.q;
+      return '<div class="item"><div class="min0"><div class="truncate" style="font-weight:600;font-size:13px">'+esc(fo.n)+'</div>'
+        +'<div class="mono" id="pm_'+it.id+'" style="font-size:10.5px;color:var(--muted)">'+Math.round(fo.k*fac)+' kcal · '+r1(fo.p*fac)+'P</div></div>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<div class="field" style="padding:5px 7px;width:66px"><input class="inp-num" style="font-size:14px" inputmode="decimal" value="'+r1(it.amount)+'" oninput="App.setParsedAmt(\''+it.id+'\',this.value)"></div>'
+        +'<div class="note-muted" style="width:36px">'+esc(fo.u)+'</div>'
+        +'<button class="x" onclick="App.removeParsed(\''+it.id+'\')">×</button></div></div>';
+    }).join("")
+    +'<div class="row2" style="margin-top:4px"><button class="btn small" onclick="App.logParsed()">Log all to '+esc(state.eatMeal)+'</button>'
+    +'<button class="btn ghost small" onclick="App.clearParsed()">Clear</button></div></div>';
+  }
+  return '<section class="card stack-sm">'
+    +'<div class="label">Quick add · type your meal</div>'
+    +'<div style="display:flex;gap:8px;align-items:stretch">'
+    +'<div class="field" style="flex:1"><input id="qaInput" value="'+esc(state.parseInput||"")+'" placeholder="e.g. 2 eggs, 150g chicken, bowl of rice" oninput="App.setParseInput(this.value)"></div>'
+    +'<button class="btn small" style="width:auto;padding:0 18px" onclick="App.parseMeal()">▶</button>'
+    +'</div>'
+    +'<div class="note-muted">Offline estimate · review &amp; edit amounts before logging</div>'
+    +review
+    +'</section>';
+}
 
 function E(name, sets, reps){ return { id:uid(), name, sets, reps }; }
 function makeDefaultPlan(){
@@ -255,7 +440,7 @@ const state = {
   flog: load(K.f, []),
   blog: load(K.b, []),
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
-  trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"",
+  trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
 };
@@ -327,6 +512,21 @@ const App = {
   },
   delFood(id){ state.flog=state.flog.filter(x=>x.id!==id); save(K.f,state.flog); render(); },
   setEatMode(m){ state.eatMode=m; render(); },
+  setParseInput(v){ state.parseInput=v; },
+  parseMeal(){ const el=document.getElementById("qaInput"); const t=(el?el.value:state.parseInput)||""; state.parseInput=t;
+    state.parsed=parseMealText(t); if(!state.parsed.length) toast("Type a meal first"); render(); },
+  setParsedAmt(id,v){ const it=state.parsed.find(x=>x.id===id); if(!it) return; it.amount=parseFloat(v)||0;
+    const fo=it.foodName?resolveFood(it.foodName):null; const el=document.getElementById("pm_"+id);
+    if(fo&&el){ const fac=it.amount/fo.q; el.textContent=Math.round(fo.k*fac)+" kcal · "+r1(fo.p*fac)+"P"; } },
+  removeParsed(id){ state.parsed=state.parsed.filter(x=>x.id!==id); render(); },
+  clearParsed(){ state.parsed=[]; state.parseInput=""; render(); },
+  logParsed(){ const items=state.parsed.filter(it=>it.foodName && it.amount>0);
+    if(!items.length){ toast("Nothing to log"); return; }
+    items.forEach(it=>{ const fo=resolveFood(it.foodName); if(!fo) return; const fac=it.amount/fo.q;
+      state.flog.push({ id:uid(), date:TODAY, meal:state.eatMeal, name:fo.n, amount:it.amount, unit:fo.u,
+        p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac }); });
+    save(K.f,state.flog); state.parsed=[]; state.parseInput="";
+    toast("Logged "+items.length+" item"+(items.length>1?"s":"")+" to "+state.eatMeal); render(); },
   addCustom(){
     const name=(document.getElementById("cName").value||"").trim();
     const p=parseFloat(document.getElementById("cP").value)||0;
@@ -584,6 +784,7 @@ function viewEat(){
     +     miniLimit("Sugars",tot.s,TARGETS.s)+miniLimit("Sat fat",tot.sa,TARGETS.sa)+'</div>'
     + '</section>'
     + eatFoodCard(fo, foodOpts, selectedIsCustom)
+    + quickAddCard()
     + '<section><div class="label">Eaten today</div><div style="margin-top:8px">'+list+'</div></section>'
     + '</div>';
 }
