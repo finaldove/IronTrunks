@@ -394,6 +394,105 @@ function quickAddCard(){
 }
 
 function E(name, sets, reps){ return { id:uid(), name, sets, reps }; }
+/* ---------- workout program generator ---------- */
+const EXLIB = [
+  /* [name, muscle, equip, pattern, level(1-3), kind C/A] */
+  ["Barbell Bench Press","chest","barbell","horiz_push",2,"C"],["Dumbbell Bench Press","chest","dumbbell","horiz_push",1,"C"],
+  ["Push-up","chest","bodyweight","horiz_push",1,"C"],["Incline Barbell Press","chest","barbell","horiz_push",2,"C"],
+  ["Incline Dumbbell Press","chest","dumbbell","horiz_push",1,"C"],["Machine Chest Press","chest","machine","horiz_push",1,"C"],
+  ["Cable Fly","chest","cable","horiz_push",1,"A"],["Dumbbell Fly","chest","dumbbell","horiz_push",1,"A"],["Dips","chest","bodyweight","horiz_push",2,"C"],
+  ["Overhead Press","shoulders","barbell","vert_push",2,"C"],["Dumbbell Shoulder Press","shoulders","dumbbell","vert_push",1,"C"],
+  ["Machine Shoulder Press","shoulders","machine","vert_push",1,"C"],["Pike Push-up","shoulders","bodyweight","vert_push",2,"C"],
+  ["Dumbbell Lateral Raise","shoulders","dumbbell","raise",1,"A"],["Cable Lateral Raise","shoulders","cable","raise",1,"A"],["Machine Lateral Raise","shoulders","machine","raise",1,"A"],
+  ["Rear Delt Fly","shoulders","dumbbell","rear",1,"A"],["Face Pull","shoulders","cable","rear",1,"A"],["Reverse Pec Deck","shoulders","machine","rear",1,"A"],
+  ["Pull-up","back","bodyweight","vert_pull",2,"C"],["Lat Pulldown","back","cable","vert_pull",1,"C"],["Assisted Pull-up","back","machine","vert_pull",1,"C"],
+  ["Chin-up","back","bodyweight","vert_pull",2,"C"],["Straight-Arm Pulldown","back","cable","vert_pull",1,"A"],
+  ["Barbell Row","back","barbell","horiz_pull",2,"C"],["Dumbbell Row","back","dumbbell","horiz_pull",1,"C"],["Seated Cable Row","back","cable","horiz_pull",1,"C"],
+  ["Chest-Supported Row","back","machine","horiz_pull",1,"C"],["Inverted Row","back","bodyweight","horiz_pull",1,"C"],
+  ["Dumbbell Shrug","back","dumbbell","shrug",1,"A"],["Barbell Shrug","back","barbell","shrug",1,"A"],
+  ["Back Squat","quads","barbell","squat",2,"C"],["Front Squat","quads","barbell","squat",3,"C"],["Goblet Squat","quads","dumbbell","squat",1,"C"],
+  ["Leg Press","quads","machine","squat",1,"C"],["Bodyweight Squat","quads","bodyweight","squat",1,"C"],["Leg Extension","quads","machine","ext_quad",1,"A"],
+  ["Bulgarian Split Squat","quads","dumbbell","lunge",2,"A"],["Walking Lunge","quads","dumbbell","lunge",1,"A"],["Reverse Lunge","quads","bodyweight","lunge",1,"A"],
+  ["Romanian Deadlift","hamstrings","barbell","hinge",2,"C"],["Dumbbell RDL","hamstrings","dumbbell","hinge",1,"C"],["Deadlift","hamstrings","barbell","hinge",3,"C"],
+  ["Leg Curl","hamstrings","machine","ham",1,"A"],["Cable Pull-through","hamstrings","cable","hinge",1,"A"],["Nordic Curl","hamstrings","bodyweight","ham",3,"A"],
+  ["Hip Thrust","glutes","barbell","glute",2,"C"],["Dumbbell Hip Thrust","glutes","dumbbell","glute",1,"A"],["Glute Bridge","glutes","bodyweight","glute",1,"A"],["Cable Glute Kickback","glutes","cable","glute",1,"A"],
+  ["Standing Calf Raise","calves","machine","calf",1,"A"],["Dumbbell Calf Raise","calves","dumbbell","calf",1,"A"],["Bodyweight Calf Raise","calves","bodyweight","calf",1,"A"],
+  ["Barbell Curl","biceps","barbell","curl",1,"A"],["Dumbbell Curl","biceps","dumbbell","curl",1,"A"],["Hammer Curl","biceps","dumbbell","curl",1,"A"],["Cable Curl","biceps","cable","curl",1,"A"],
+  ["Cable Triceps Pushdown","triceps","cable","ext",1,"A"],["Overhead Dumbbell Extension","triceps","dumbbell","ext",1,"A"],["Close-Grip Bench Press","triceps","barbell","ext",2,"C"],
+  ["Bench Dips","triceps","bodyweight","ext",1,"A"],["Skullcrusher","triceps","barbell","ext",2,"A"],
+  ["Hanging Leg Raise","core","bodyweight","core",2,"A"],["Plank","core","bodyweight","core",1,"A",true],["Cable Crunch","core","cable","core",1,"A"],["Cable Woodchop","core","cable","core",1,"A"],["Ab Wheel","core","bodyweight","core",2,"A"],
+  /* extra bodyweight + yoga/pilates */
+  ["Incline Push-up","chest","bodyweight","horiz_push",1,"C"],["Diamond Push-up","triceps","bodyweight","ext",2,"A"],
+  ["Pseudo Planche Push-up","shoulders","bodyweight","vert_push",3,"C"],["Wall Handstand Hold","shoulders","bodyweight","vert_push",3,"C",true],
+  ["Negative Pull-up","back","bodyweight","vert_pull",1,"C"],
+  ["Wall Sit","quads","bodyweight","squat",1,"C",true],["Pistol Squat","quads","bodyweight","squat",3,"C"],["Cossack Squat","quads","bodyweight","squat",2,"A"],
+  ["Step-up","quads","bodyweight","lunge",1,"A"],["Bodyweight Walking Lunge","quads","bodyweight","lunge",1,"A"],["Curtsy Lunge","glutes","bodyweight","lunge",1,"A"],
+  ["Single-Leg RDL","hamstrings","bodyweight","hinge",2,"C"],["Bodyweight Good Morning","hamstrings","bodyweight","hinge",1,"C"],["Superman Hold","hamstrings","bodyweight","ham",1,"A",true],
+  ["Single-Leg Glute Bridge","glutes","bodyweight","glute",1,"A"],["Bodyweight Hip Thrust","glutes","bodyweight","glute",1,"A"],["Glute Bridge March","glutes","bodyweight","glute",1,"A"],["Donkey Kick","glutes","bodyweight","glute",1,"A"],
+  ["Hollow Body Hold","core","bodyweight","core",2,"A",true],["Side Plank","core","bodyweight","core",1,"A",true],["Boat Pose","core","bodyweight","core",2,"A",true],["L-Sit Hold","core","bodyweight","core",3,"A",true],
+  ["Dead Bug","core","bodyweight","core",1,"A"],["Bird Dog","core","bodyweight","core",1,"A"],["Mountain Climbers","core","bodyweight","core",1,"A"]
+].map(a=>({n:a[0],mus:a[1],eq:a[2],pat:a[3],lv:a[4],kind:a[5],iso:a[6]||false}));
+
+const SPLITS={
+  3:["FULL","cond","FULL","rest","FULL","cond","rest"],
+  4:["UPPER","LOWER","cond","UPPER","LOWER","rest","rest"],
+  5:["PUSH","PULL","LEGS","UPPER","LOWER","cond","rest"],
+  6:["PUSH","PULL","LEGS","PUSH","PULL","LEGS","rest"]
+};
+const SESS={
+  FULL:[{pat:["squat"],kind:"C"},{pat:["horiz_push","vert_push"],kind:"C"},{pat:["horiz_pull","vert_pull"],kind:"C"},{pat:["hinge","glute"],kind:"C"},{pat:["core"],kind:"A"},{pat:["raise"],kind:"A"}],
+  UPPER:[{pat:["horiz_push"],kind:"C"},{pat:["horiz_pull"],kind:"C"},{pat:["vert_push"],kind:"C"},{pat:["vert_pull"],kind:"C"},{pat:["raise"],kind:"A"},{pat:["curl"],kind:"A"},{pat:["ext"],kind:"A"}],
+  LOWER:[{pat:["squat"],kind:"C"},{pat:["hinge"],kind:"C"},{pat:["lunge","glute"],kind:"A"},{pat:["ham","ext_quad"],kind:"A"},{pat:["calf"],kind:"A"},{pat:["core"],kind:"A"}],
+  PUSH:[{pat:["horiz_push"],kind:"C"},{pat:["vert_push"],kind:"C"},{pat:["horiz_push"],kind:"A"},{pat:["raise"],kind:"A"},{pat:["ext"],kind:"A"}],
+  PULL:[{pat:["vert_pull"],kind:"C"},{pat:["horiz_pull"],kind:"C"},{pat:["rear"],kind:"A"},{pat:["curl"],kind:"A"},{pat:["shrug"],kind:"A"}],
+  LEGS:[{pat:["squat"],kind:"C"},{pat:["hinge","glute"],kind:"C"},{pat:["lunge"],kind:"A"},{pat:["ham","ext_quad"],kind:"A"},{pat:["calf"],kind:"A"},{pat:["core"],kind:"A"}]
+};
+const SESS_FOCUS={ FULL:"Full Body", UPPER:"Upper Body", LOWER:"Lower Body", PUSH:"Push · Chest/Shoulders/Triceps", PULL:"Pull · Back/Biceps", LEGS:"Legs" };
+const EMPH={
+  shoulders:{pat:["raise","rear"],sessions:["PUSH","PULL","UPPER","FULL"]},
+  back:{pat:["horiz_pull","vert_pull"],sessions:["PULL","UPPER","FULL"]},
+  chest:{pat:["horiz_push"],sessions:["PUSH","UPPER","FULL"]},
+  arms:{pat:["curl","ext"],sessions:["PUSH","PULL","UPPER","FULL"]},
+  glutes:{pat:["glute"],sessions:["LOWER","LEGS","FULL"]},
+  legs:{pat:["lunge","ext_quad"],sessions:["LOWER","LEGS","FULL"]},
+  core:{pat:["core"],sessions:["UPPER","LOWER","PUSH","PULL","LEGS","FULL"]}
+};
+function equipOK(eq,choice){ if(choice==="dumbbell") return eq==="dumbbell"||eq==="bodyweight"; if(choice==="bodyweight") return eq==="bodyweight"; return true; }
+function repScheme(goal,kind){
+  if(goal==="strength") return kind==="C"?["4","4-6"]:["3","6-8"];
+  if(goal==="endurance") return kind==="C"?["3","12-15"]:["3","15-20"];
+  if(goal==="powerbuilding") return kind==="C"?["5","4-6"]:["3","8-12"];
+  return kind==="C"?["4","6-10"]:["3","10-15"];
+}
+function buildProgram(opts){
+  const level={beginner:1,intermediate:2,advanced:3}[opts.level]||2;
+  const goal=opts.goal||"hypertrophy", equip=opts.equip||"gym", days=opts.days||4, emph=opts.emphasis||[];
+  const split=SPLITS[days]||SPLITS[4]; const used=new Set();
+  const slotCap={1:4,2:5,3:6}[level];
+  function choose(slot){
+    let cands=EXLIB.filter(e=> slot.pat.indexOf(e.pat)>=0 && e.lv<=level && equipOK(e.eq,equip) && (slot.kind==="C"?e.kind==="C":true));
+    if(slot.kind==="A"){ const acc=cands.filter(e=>e.kind==="A"); if(acc.length) cands=acc; }
+    if(!cands.length) cands=EXLIB.filter(e=> slot.pat.indexOf(e.pat)>=0 && e.lv<=level && equipOK(e.eq,equip));
+    if(!cands.length) return null;
+    const fresh=cands.filter(e=>!used.has(e.n)); if(fresh.length) cands=fresh;
+    const e=cands[Math.floor(Math.random()*cands.length)]; used.add(e.n); return e;
+  }
+  const plan=[]; let dayNum=0;
+  split.forEach(s=>{ dayNum++;
+    if(s==="rest"){ plan.push({id:uid(),name:"Day "+dayNum,focus:"Rest",type:"rest",note:"Full rest",exercises:[]}); return; }
+    if(s==="cond"){ plan.push({id:uid(),name:"Day "+dayNum,focus:"Conditioning",type:"conditioning",note:"Intervals / bike / row · 20-30 min",exercises:[]}); return; }
+    let slots=SESS[s].slice(0, slotCap + (s==="FULL"?1:0));
+    emph.forEach(mg=>{ const ep=EMPH[mg]; if(ep && ep.sessions.indexOf(s)>=0) slots=slots.concat([{pat:ep.pat,kind:"A"}]); });
+    const exs=[];
+    slots.forEach(slot=>{ const e=choose(slot); if(!e) return; const rs=repScheme(goal,e.kind); let sets=rs[0], reps=rs[1];
+      if(level===1 && e.kind==="C") sets=String(Math.max(3,(+rs[0])-1));
+      if(e.iso){ reps = goal==="endurance"?"45-60s":"30-45s"; if(+sets>3) sets="3"; }
+      exs.push(E(e.n,sets,reps)); });
+    plan.push({id:uid(),name:"Day "+dayNum,focus:SESS_FOCUS[s],type:"lift",note:"",exercises:exs});
+  });
+  return plan;
+}
+
 function makeDefaultPlan(){
   return [
     { id:uid(), name:"Day 1", focus:"Back & Rear Delts · width", type:"lift", note:"", exercises:[
@@ -447,6 +546,7 @@ const state = {
   profile: load(K.pr, null),
   mealPlan: load(K.mp, null),
   setupOpen:false, setupData:null, setupPreview:null,
+  progOpen:false, progData:null,
 };
 save(K.p, state.plan); // lock in default on first run
 
@@ -554,6 +654,15 @@ const App = {
   setType(did,type){ const d=state.plan.find(x=>x.id===did); if(d){ d.type=type; save(K.p,state.plan); render(); } },
   resetPlan(){ if(!confirm("Reset the program to the default? This wipes your plan edits (logged sets, food and weight are NOT affected).")) return;
     state.plan=makeDefaultPlan(); save(K.p,state.plan); state.trainDay=null; state.trainEx=null; toast("Reset to default"); render(); },
+  openProgram(){ state.progData={ level:"intermediate", goal:"hypertrophy", days:"4", equip:"gym", emphasis:[] }; state.progOpen=true; render(); },
+  closeProgram(){ state.progOpen=false; render(); },
+  pickProg(k,v){ if(state.progData) state.progData[k]=v; render(); },
+  toggleEmph(m){ const a=state.progData.emphasis, i=a.indexOf(m);
+    if(i>=0) a.splice(i,1); else { if(a.length>=3){ toast("Up to 3 areas"); return; } a.push(m); } render(); },
+  generateProgram(){ const d=state.progData;
+    if(state.plan && state.plan.some(x=>x.type==="lift" && x.exercises.length) && !confirm("Replace your current program with a generated one? Your logged sets, food and weight are NOT affected.")) return;
+    state.plan=buildProgram({ level:d.level, goal:d.goal, days:+d.days, equip:d.equip, emphasis:d.emphasis });
+    save(K.p,state.plan); state.trainDay=null; state.trainEx=null; state.progOpen=false; toast("Program generated"); render(); },
 
   /* ---- EAT ---- */
   setMeal(m){ state.eatMeal=m; render(); },
@@ -883,6 +992,27 @@ function trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyE
     +'</div>'+logBtn+'</section>';
 }
 
+function programPanel(){
+  if(!state.progOpen){
+    return '<section class="card stack-sm"><div class="label">Auto-generate</div>'
+      +'<div class="note-muted">Build a balanced program for your level, goal, days &amp; equipment — then edit anything below.</div>'
+      +'<button class="btn" onclick="App.openProgram()">Generate a program</button></section>';
+  }
+  const d=state.progData;
+  const seg=(k,opts)=>'<div class="seg" style="width:100%;flex-wrap:wrap">'+opts.map(o=>'<button style="flex:1;min-width:62px;'+(d[k]===o[0]?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.pickProg(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join("")+'</div>';
+  const emphChips=[["shoulders","Shoulders"],["back","Back"],["chest","Chest"],["arms","Arms"],["glutes","Glutes"],["legs","Legs"],["core","Core"]]
+    .map(o=>'<button class="chip'+(d.emphasis.indexOf(o[0])>=0?" on":"")+'" onclick="App.toggleEmph(\''+o[0]+'\')">'+o[1]+'</button>').join("");
+  return '<section class="card stack-sm"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Auto-generate</div>'
+    +'<button class="btn ghost small" style="width:auto;padding:5px 12px;color:var(--text)" onclick="App.closeProgram()">Cancel</button></div>'
+    +'<div><div class="label">Experience</div><div style="margin-top:6px">'+seg("level",[["beginner","Beginner"],["intermediate","Intermediate"],["advanced","Advanced"]])+'</div></div>'
+    +'<div><div class="label">Goal</div><div style="margin-top:6px">'+seg("goal",[["strength","Strength"],["hypertrophy","Muscle"],["endurance","Endurance"],["powerbuilding","Power+Build"]])+'</div></div>'
+    +'<div><div class="label">Days / week</div><div style="margin-top:6px">'+seg("days",[["3","3"],["4","4"],["5","5"],["6","6"]])+'</div></div>'
+    +'<div><div class="label">Equipment</div><div style="margin-top:6px">'+seg("equip",[["gym","Full gym"],["dumbbell","Dumbbells"],["bodyweight","Bodyweight"]])+'</div></div>'
+    +'<div><div class="label">Emphasis · optional, max 3</div><div class="chips" style="margin-top:6px">'+emphChips+'</div></div>'
+    +'<div class="note-muted">Gives exercises, sets &amp; reps — you choose the weight and add load over time. Warm up first, and swap anything that causes pain.</div>'
+    +'<button class="btn" onclick="App.generateProgram()">Generate &amp; replace program</button></section>';
+}
+
 function viewPlan(){
   const cards = state.plan.map(d=>{
     const types=[["lift","Lift","var(--teal)"],["conditioning","Cond","var(--amber)"],["rest","Rest","var(--muted)"]];
@@ -918,6 +1048,7 @@ function viewPlan(){
   return '<div class="stack-sm">'
     + '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Training plan</div>'
     +   '<div class="mono" style="font-size:11px;color:var(--muted)">'+lifts+' lifting days</div></div>'
+    + programPanel()
     + cards
     + '<button class="btn ghost" style="margin-top:4px" onclick="App.resetPlan()">↺ Reset to default program</button>'
     + '</div>';
