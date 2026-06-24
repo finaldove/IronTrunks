@@ -521,7 +521,7 @@ function makeDefaultPlan(){
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", meta:"il.meta" };
-const APP_VERSION = "v20";
+const APP_VERSION = "v21";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -548,7 +548,7 @@ const state = {
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
   viewDate:TODAY, editFood:null, editSet:null,
-  expand:{plan:false, quick:false}, fixFood:null,
+  expand:{plan:false, quick:false}, fixFood:null, perSet:{},
   meta: load(K.meta, {}),
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
@@ -633,6 +633,27 @@ const App = {
     save(K.w, state.wlog); toast("Set logged"); render();
   },
   delSet(id){ state.wlog=state.wlog.filter(x=>x.id!==id); save(K.w,state.wlog); render(); },
+  togglePerSet(id){ state.perSet[id]=!state.perSet[id]; render(); },
+  logExercise(id){
+    const d=App.currentDay(); if(!d) return; const ex=d.exercises.find(e=>e.id===id); if(!ex) return;
+    const w=parseFloat((document.getElementById("qw_"+id)||{}).value);
+    const rp=parseInt((document.getElementById("qr_"+id)||{}).value,10);
+    const n=parseInt((document.getElementById("qs_"+id)||{}).value,10);
+    if(!(w>=0)||!(rp>0)||!(n>0)){ toast("Enter weight, reps & sets"); return; }
+    for(let i=0;i<n;i++) state.wlog.push({ id:uid(), date:state.viewDate, day:d.name, focus:d.focus, exercise:ex.name, weight:w, reps:rp });
+    save(K.w,state.wlog); toast("Logged "+n+" × "+ex.name); render();
+  },
+  logEachSet(id, n){
+    const d=App.currentDay(); if(!d) return; const ex=d.exercises.find(e=>e.id===id); if(!ex) return;
+    let logged=0;
+    for(let i=0;i<n;i++){
+      const w=parseFloat((document.getElementById("psw_"+id+"_"+i)||{}).value);
+      const rp=parseInt((document.getElementById("psr_"+id+"_"+i)||{}).value,10);
+      if(w>=0 && rp>0){ state.wlog.push({ id:uid(), date:state.viewDate, day:d.name, focus:d.focus, exercise:ex.name, weight:w, reps:rp }); logged++; }
+    }
+    if(!logged){ toast("Fill in at least one set"); return; }
+    save(K.w,state.wlog); toast("Logged "+logged+" × "+ex.name); render();
+  },
   setTrainMode(m){ state.trainMode=m; render(); },
   setTrainCustomName(v){ state.trainCustomName=v; },
   logCustomSet(){
@@ -1054,6 +1075,44 @@ function backupNudge(){
     +'<span style="font-size:13px;color:var(--text)">⤓ '+msg+' — tap to export</span><span class="chip on" style="white-space:nowrap">Export</span></button>';
 }
 
+function lastWeight(name){ for(let i=state.wlog.length-1;i>=0;i--){ if(state.wlog[i].exercise===name) return state.wlog[i].weight; } return ""; }
+function firstNum(s){ const m=String(s==null?"":s).match(/\d+/); return m?m[0]:""; }
+function planExCard(day, ex){
+  const today=state.wlog.filter(s=>s.date===state.viewDate);
+  const done=today.filter(s=>s.exercise===ex.name).length;
+  const tgtSets=Math.max(1, parseInt(ex.sets,10)||1);
+  const tgtReps=firstNum(ex.reps);
+  const lw=lastWeight(ex.name);
+  const wph=lw!==""?String(lw):"40", rph=tgtReps!==""?tgtReps:"8";
+  const per=!!state.perSet[ex.id];
+  const doneStr='<div class="mono" style="font-size:12px;color:'+(done>=tgtSets&&done>0?"var(--green)":"var(--muted)")+'">'+done+' / '+tgtSets+' sets'+(done>=tgtSets&&done>0?" ✓":"")+'</div>';
+  const toggleBtn='<button class="chip'+(per?" on":"")+'" data-id="'+ex.id+'" onclick="App.togglePerSet(this.dataset.id)">'+(per?"▾":"▸")+' Per set</button>';
+  const hdr='<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">'
+    +'<div class="truncate" style="font-weight:700;font-size:15px;color:var(--text)">'+esc(ex.name)+'</div>'
+    +'<div class="mono" style="font-size:12px;color:var(--gold);white-space:nowrap">'+esc(ex.sets)+' × '+esc(ex.reps)+'</div></div>';
+  let bodyHtml;
+  if(per){
+    let rows="";
+    for(let i=0;i<tgtSets;i++){
+      rows+='<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span class="mono" style="font-size:11px;color:var(--muted);width:26px">S'+(i+1)+'</span>'
+        +'<input id="psw_'+ex.id+'_'+i+'" class="inp-num" inputmode="decimal" placeholder="'+wph+'" value="'+(lw!==""?lw:"")+'" style="flex:1">'
+        +'<span class="mono" style="font-size:12px;color:var(--muted)">×</span>'
+        +'<input id="psr_'+ex.id+'_'+i+'" class="inp-num" inputmode="numeric" placeholder="'+rph+'" value="'+(tgtReps!==""?tgtReps:"")+'" style="flex:1"></div>';
+    }
+    bodyHtml=rows
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">'
+      +'<button class="btn small" style="width:auto;padding:8px 18px" data-id="'+ex.id+'" data-n="'+tgtSets+'" onclick="App.logEachSet(this.dataset.id,+this.dataset.n)">Log all</button>'
+      +doneStr+toggleBtn+'</div>';
+  } else {
+    bodyHtml='<div style="display:flex;gap:6px;margin-top:6px;align-items:flex-end">'
+      +'<div style="flex:1"><div class="label">Weight kg</div><div class="field" style="margin-top:4px"><input id="qw_'+ex.id+'" class="inp-num" inputmode="decimal" placeholder="'+wph+'" value="'+(lw!==""?lw:"")+'"></div></div>'
+      +'<div style="flex:1"><div class="label">Reps</div><div class="field" style="margin-top:4px"><input id="qr_'+ex.id+'" class="inp-num" inputmode="numeric" placeholder="'+rph+'" value="'+(tgtReps!==""?tgtReps:"")+'"></div></div>'
+      +'<div style="width:48px"><div class="label">Sets</div><div class="field" style="margin-top:4px"><input id="qs_'+ex.id+'" class="inp-num" inputmode="numeric" value="'+tgtSets+'"></div></div>'
+      +'<button class="btn small" style="width:auto;padding:9px 16px" data-id="'+ex.id+'" onclick="App.logExercise(this.dataset.id)">Log</button></div>'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:7px">'+doneStr+toggleBtn+'</div>';
+  }
+  return '<section class="card stack-sm">'+hdr+bodyHtml+'</section>';
+}
 function viewTrain(){
   const ld=App.liftDays();
   if(ld.length===0){
@@ -1085,10 +1144,13 @@ function viewTrain(){
         +'<div style="display:flex;align-items:center;gap:8px"><div class="mono" style="font-size:15px;font-weight:700;color:var(--teal);white-space:nowrap">'+s.weight+'kg × '+s.reps+'</div>'
         +'<button class="x" onclick="App.delSet(\''+s.id+'\')">×</button></div></div>').join("")+'</div>';
 
+  const planCards=day.exercises.filter(e=>e.name).map(ex=>planExCard(day,ex)).join("");
+
   return '<div class="stack">'
     + '<section class="stack-sm">'+dateStepper()+banner("Today's Session","本日の鍛錬")+'<div class="chips">'+chips+'</div>'
     + '<div style="margin-top:8px;font-size:13px;color:var(--muted)">'+esc(day.focus)+'</div></section>'
-    + trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyEx)
+    + (planCards || emptyBox("No exercises in this day — add them in Plan, or log off-plan below."))
+    + expander('offplan','＋ Log something off-plan','Search any exercise, or add a custom one', ()=>trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyEx))
     + '<section><div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Logged '+esc(dayWord)+'</div>'
     +   '<div class="mono" style="font-size:12px;color:var(--muted)">'+today.length+' sets</div></div>'+list+'</section>'
     + '</div>';
