@@ -286,7 +286,7 @@ const FOODS = [
   ["Sesame dressing","Sauce","tbsp",1,0.4,3.3,3.8,2,0.5,49],
 ].map(a => ({ n:a[0], g:a[1], u:a[2], q:a[3], p:a[4], c:a[5], f:a[6], s:a[7], sa:a[8], k:a[9] }));
 const FOOD_BY_NAME = Object.fromEntries(FOODS.map(x => [x.n, x]));
-function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:"serving", q:1, p:cf.p, c:cf.c, f:cf.f, s:cf.s, sa:cf.sa, k:cf.k, custom:true, id:cf.id }; }
+function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:cf.u||"serving", q:cf.q||1, p:cf.p, c:cf.c, f:cf.f, s:cf.s||0, sa:cf.sa||0, k:cf.k, custom:true, id:cf.id }; }
 function resolveFood(name){ if(FOOD_BY_NAME[name]) return FOOD_BY_NAME[name]; for(var i=0;i<state.customFoods.length;i++){ if(state.customFoods[i].n===name) return customAsFood(state.customFoods[i]); } return null; }
 
 /* ---------- offline meal parser ---------- */
@@ -521,7 +521,7 @@ function makeDefaultPlan(){
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", meta:"il.meta" };
-const APP_VERSION = "v21";
+const APP_VERSION = "v22";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -548,7 +548,7 @@ const state = {
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
   viewDate:TODAY, editFood:null, editSet:null,
-  expand:{plan:false, quick:false}, fixFood:null, perSet:{},
+  expand:{plan:false, quick:false}, fixFood:null, perSet:{}, planEdit:false, planNewFood:null,
   meta: load(K.meta, {}),
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
@@ -610,7 +610,28 @@ const App = {
     if(!(v>0)){ toast("Enter a goal weight"); return; }
     if(!state.profile) state.profile={ onboarded:true, targets:DEFAULT_TARGETS };
     state.profile.goalWeight=v; save(K.pr,state.profile); applyTargets(); toast("Goal weight set"); render(); },
-  generatePlan(){ state.mealPlan=buildPlan(); save(K.mp,state.mealPlan); toast("Plan generated"); render(); },
+  generatePlan(){ state.mealPlan=buildPlan(); state.planEdit=false; state.planNewFood=null; save(K.mp,state.mealPlan); toast("Plan generated"); render(); },
+  buildOwnPlan(){ state.mealPlan={meals:{breakfast:[],lunch:[],dinner:[],snack:[]},tot:{p:0,c:0,f:0,k:0,s:0,sa:0},ts:Date.now()}; state.planEdit=true; state.expand.plan=true; save(K.mp,state.mealPlan); render(); },
+  togglePlanEdit(){ state.planEdit=!state.planEdit; state.planNewFood=null; render(); },
+  planRecompute(){ const mp=state.mealPlan; if(!mp) return; const all=[].concat(mp.meals.breakfast||[],mp.meals.lunch||[],mp.meals.dinner||[],mp.meals.snack||[]); const t=sumMac(all); mp.tot={p:t.p,c:t.c,f:t.f,k:t.k,s:t.s,sa:t.sa}; save(K.mp,mp); },
+  setPlanAmount(meal,idx,v){ const a=parseFloat(v); const mp=state.mealPlan; if(!mp||!mp.meals[meal]||!mp.meals[meal][idx]) return; if(a>0){ mp.meals[meal][idx].amount=a; App.planRecompute(); render(); } },
+  removePlanFood(meal,idx){ const mp=state.mealPlan; if(!mp||!mp.meals[meal]) return; mp.meals[meal].splice(idx,1); App.planRecompute(); render(); },
+  addPlanFood(meal){ const nameEl=document.getElementById("pf_"+meal), amtEl=document.getElementById("pa_"+meal);
+    const name=((nameEl&&nameEl.value)||"").trim(); const amt=parseFloat(amtEl&&amtEl.value);
+    if(!name){ toast("Enter a food"); return; }
+    if(!(amt>0)){ toast("Enter an amount"); return; }
+    if(resolveFood(name)){ state.mealPlan.meals[meal].push({name:name, amount:amt}); App.planRecompute(); toast("Added "+name); render(); }
+    else { state.planNewFood={meal:meal, name:name, amount:amt}; render(); }
+  },
+  savePlanNewFood(){ const pn=state.planNewFood; if(!pn) return;
+    const num=id=>{ const v=parseFloat((document.getElementById(id)||{}).value); return isFinite(v)?v:0; };
+    const p=num("npP"),c=num("npC"),f=num("npF"); let k=num("npK"); if(!(k>0)) k=Math.round(p*4+c*4+f*9);
+    if(p+c+f+k<=0){ toast("Enter at least one macro"); return; }
+    state.customFoods.push({ id:uid(), n:pn.name, u:"g", q:100, p:p, c:c, f:f, s:0, sa:0, k:k }); save(K.cf,state.customFoods);
+    state.mealPlan.meals[pn.meal].push({name:pn.name, amount:pn.amount}); App.planRecompute();
+    state.planNewFood=null; toast('"'+pn.name+'" added'); render();
+  },
+  cancelPlanNewFood(){ state.planNewFood=null; render(); },
   clearPlan(){ state.mealPlan=null; save(K.mp,null); render(); },
   logPlanMeal(key){ const meal={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",snack:"Snack"}[key];
     const items=state.mealPlan && state.mealPlan.meals[key]; if(!items||!items.length){ toast("Nothing to log"); return; }
@@ -676,8 +697,9 @@ const App = {
   savePlanSoon(){ if(App._pt) clearTimeout(App._pt); App._pt=setTimeout(()=>save(K.p,state.plan),400); },
   editFocus(id,v){ const d=state.plan.find(x=>x.id===id); if(d){ d.focus=v; App.savePlanSoon(); } },
   editNote(id,v){ const d=state.plan.find(x=>x.id===id); if(d){ d.note=v; App.savePlanSoon(); } },
-  editEx(did,eid,field,v){ const d=state.plan.find(x=>x.id===did); if(!d)return; const e=d.exercises.find(x=>x.id===eid); if(e){ e[field]=v; App.savePlanSoon(); } },
-  addEx(did){ const d=state.plan.find(x=>x.id===did); if(d){ d.exercises.push({id:uid(),name:"",sets:"3",reps:""}); save(K.p,state.plan); render(); } },
+  editEx(did,eid,field,v){ const d=state.plan.find(x=>x.id===did); if(!d)return; const e=d.exercises.find(x=>x.id===eid); if(e){ e[field]=v; App.markTrain(); App.savePlanSoon(); } },
+  addEx(did){ const d=state.plan.find(x=>x.id===did); if(d){ d.exercises.push({id:uid(),name:"",sets:"3",reps:""}); App.markTrain(); save(K.p,state.plan); render(); } },
+  markTrain(){ if(!state.meta.trainReady){ state.meta.trainReady=true; save(K.meta,state.meta); } },
   delEx(did,eid){ const d=state.plan.find(x=>x.id===did); if(d){ d.exercises=d.exercises.filter(e=>e.id!==eid); save(K.p,state.plan); render(); } },
   moveEx(did,eid,dir){ const d=state.plan.find(x=>x.id===did); if(!d)return; const i=d.exercises.findIndex(e=>e.id===eid), j=i+dir;
     if(i<0||j<0||j>=d.exercises.length)return; const a=d.exercises; const t=a[i]; a[i]=a[j]; a[j]=t; save(K.p,state.plan); render(); },
@@ -692,7 +714,7 @@ const App = {
   generateProgram(){ const d=state.progData;
     if(state.plan && state.plan.some(x=>x.type==="lift" && x.exercises.length) && !confirm("Replace your current program with a generated one? Your logged sets, food and weight are NOT affected.")) return;
     state.plan=buildProgram({ level:d.level, goal:d.goal, days:+d.days, equip:d.equip, emphasis:d.emphasis });
-    save(K.p,state.plan); state.trainDay=null; state.trainEx=null; state.progOpen=false; toast("Program generated"); render(); },
+    save(K.p,state.plan); state.trainDay=null; state.trainEx=null; state.progOpen=false; App.markTrain(); toast("Program generated"); render(); },
 
   /* ---- EAT ---- */
   setMeal(m){ state.eatMeal=m; render(); },
@@ -914,25 +936,55 @@ function fixupCard(){
 function mealPlanCard(){
   const mp=state.mealPlan;
   if(!mp){ return '<section class="card stack-sm"><div class="label">Meal plan</div>'
-    +'<div class="note-muted">Generate a Breakfast / Lunch / Dinner / Snack plan that hits your targets — keep it here to follow as you log.</div>'
-    +'<button class="btn" onclick="App.generatePlan()">Generate plan</button></section>'; }
+    +'<div class="note-muted">Generate a plan that hits your targets, or build your own meal by meal.</div>'
+    +'<div class="row2"><button class="btn small" style="width:100%" onclick="App.generatePlan()">Generate</button>'
+    +'<button class="btn small ghost" style="width:100%;color:var(--text)" onclick="App.buildOwnPlan()">Build your own</button></div></section>'; }
+  const edit=state.planEdit;
   const order=[["breakfast","Breakfast"],["lunch","Lunch"],["dinner","Dinner"],["snack","Snack"]];
-  const body=order.map(o=>{ const items=mp.meals[o[0]]||[]; const m=sumMac(items);
+  const body=order.map(o=>{ const key=o[0]; const items=mp.meals[key]||[]; const m=sumMac(items);
+    const rows=items.map((it,idx)=>{ const f=resolveFood(it.name);
+      if(edit){
+        return '<div class="item" style="padding:6px 10px"><div class="min0"><div class="truncate" style="font-size:13px">'+esc(it.name)+(f?'':' <span style="color:var(--red);font-size:10px">· needs macros</span>')+'</div></div>'
+          +'<div style="display:flex;align-items:center;gap:5px"><input class="inp-num" inputmode="decimal" value="'+r1(it.amount)+'" style="max-width:60px" onchange="App.setPlanAmount(\''+key+'\','+idx+',this.value)"><span class="mono" style="font-size:10px;color:var(--muted);min-width:18px">'+(f?esc(f.u):'?')+'</span>'
+          +'<button class="x" onclick="App.removePlanFood(\''+key+'\','+idx+')">×</button></div></div>';
+      }
+      return '<div class="item" style="padding:7px 11px"><div class="min0"><div class="truncate" style="font-size:13px">'+esc(it.name)+(f?'':' <span style="color:var(--red);font-size:11px">· not in this app</span>')+'</div></div>'
+        +'<div class="mono" style="font-size:12px;color:'+(f?'var(--gold)':'var(--red)')+';white-space:nowrap">'+r1(it.amount)+' '+(f?esc(f.u):'?')+'</div></div>';
+    }).join("");
+    let addRow="";
+    if(edit && state.planNewFood && state.planNewFood.meal===key){
+      addRow='<div style="margin-top:6px;padding:9px;border:1px dashed var(--gold);border-radius:10px">'
+        +'<div class="note-muted">“'+esc(state.planNewFood.name)+'” isn\'t in the app — enter its macros per 100 g:</div>'
+        +'<div class="row2" style="margin-top:6px"><div><div class="label">Protein g</div><div class="field" style="margin-top:4px"><input id="npP" class="inp-num" inputmode="decimal" placeholder="0"></div></div>'
+        +'<div><div class="label">Carbs g</div><div class="field" style="margin-top:4px"><input id="npC" class="inp-num" inputmode="decimal" placeholder="0"></div></div></div>'
+        +'<div class="row2"><div><div class="label">Fat g</div><div class="field" style="margin-top:4px"><input id="npF" class="inp-num" inputmode="decimal" placeholder="0"></div></div>'
+        +'<div><div class="label">Calories</div><div class="field" style="margin-top:4px"><input id="npK" class="inp-num" inputmode="decimal" placeholder="auto"></div></div></div>'
+        +'<div class="row2" style="margin-top:6px"><button class="btn small" style="width:100%" onclick="App.savePlanNewFood()">Save &amp; add</button>'
+        +'<button class="btn small ghost" style="width:100%;color:var(--text)" onclick="App.cancelPlanNewFood()">Cancel</button></div></div>';
+    } else if(edit){
+      addRow='<div style="display:flex;gap:6px;margin-top:6px;align-items:center">'
+        +'<input id="pf_'+key+'" list="foodlist" autocomplete="off" placeholder="Add food…" style="flex:2">'
+        +'<input id="pa_'+key+'" class="inp-num" inputmode="decimal" placeholder="amt" style="flex:1">'
+        +'<button class="btn small" style="width:auto;padding:9px 14px" onclick="App.addPlanFood(\''+key+'\')">＋</button></div>';
+    }
     return '<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;align-items:baseline">'
       +'<div class="gauge-name">'+o[1]+'</div><div class="mono" style="font-size:11px;color:var(--muted)">'+Math.round(m.k)+' kcal · '+Math.round(m.p)+'P</div></div>'
-      +'<div class="stack-sm" style="margin-top:5px">'+items.map(it=>{ const f=resolveFood(it.name);
-         return '<div class="item" style="padding:7px 11px"><div class="min0"><div class="truncate" style="font-size:13px">'+esc(it.name)+(f?'':' <span style="color:var(--red);font-size:11px">· not in this app</span>')+'</div></div>'
-           +'<div class="mono" style="font-size:12px;color:'+(f?'var(--gold)':'var(--red)')+';white-space:nowrap">'+r1(it.amount)+' '+(f?esc(f.u):'?')+'</div></div>'; }).join("")+'</div>'
-      +'<button class="btn ghost small" style="margin-top:6px;color:var(--text)" onclick="App.logPlanMeal(\''+o[0]+'\')">Log '+o[1]+'</button></div>'; }).join("");
-  const t=mp.tot, T=TARGETS;
+      +'<div class="stack-sm" style="margin-top:5px">'+(rows||'<div class="note-muted" style="font-size:12px">No items yet</div>')+'</div>'
+      + addRow
+      + (edit?'':'<button class="btn ghost small" style="margin-top:6px;color:var(--text)" onclick="App.logPlanMeal(\''+key+'\')">Log '+o[1]+'</button>')
+      +'</div>'; }).join("");
+  const all=[].concat(mp.meals.breakfast||[],mp.meals.lunch||[],mp.meals.dinner||[],mp.meals.snack||[]);
+  const t=sumMac(all), T=TARGETS;
   const summ='<div class="row2" style="margin-top:12px">'
     +'<div class="stat"><div class="label">Plan kcal</div><div class="v" style="font-size:18px">'+Math.round(t.k)+'<span style="font-size:11px;color:var(--muted)"> / '+T.k+'</span></div></div>'
     +'<div class="stat"><div class="label">Plan protein</div><div class="v" style="font-size:18px;color:var(--gold)">'+Math.round(t.p)+'<span style="font-size:11px;color:var(--muted)"> / '+T.p+'</span></div></div></div>'
-    +'<div class="note-muted" style="margin-top:4px">'+Math.round(t.c)+'C · '+Math.round(t.f)+'F · estimate — tweak amounts as you log</div>';
-  return '<section class="card stack-sm"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Meal plan</div>'
-    +'<button class="btn ghost small" style="width:auto;padding:5px 12px;color:var(--text)" onclick="App.generatePlan()">↻ New</button></div>'
-    +body+summ
-    +'<button class="btn ghost small" onclick="App.clearPlan()">Clear plan</button></section>';
+    +'<div class="note-muted" style="margin-top:4px">'+Math.round(t.c)+'C · '+Math.round(t.f)+'F'+(edit?' · add foods by name + amount; unknown foods ask for macros':' · estimate — tweak amounts as you log')+'</div>';
+  const head='<div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Meal plan</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +(edit?'<button class="btn ghost small" style="width:auto;padding:5px 10px;color:var(--text)" onclick="App.generatePlan()">↻ New</button>':'')
+    +'<button class="chip'+(edit?' on':'')+'" onclick="App.togglePlanEdit()">'+(edit?'Done':'Edit')+'</button></div></div>';
+  return '<section class="card stack-sm">'+head+body+summ
+    +(edit?'<button class="btn ghost small" onclick="App.clearPlan()">Clear plan</button>':'')+'</section>';
 }
 
 function macroBar(label, eaten, target, limit){
@@ -1049,8 +1101,10 @@ function guideCard(){
   if(state.meta.guideHidden) return "";
   const steps=[
     {done: !!(state.profile&&state.profile.onboarded), label:"Set your targets", act:"App.openSetup()"},
-    {done: state.flog.length>0, label:"Log a meal", act:"App.setTab('eat')"},
-    {done: state.wlog.length>0, label:"Log a workout set", act:"App.setTab('train')"},
+    {done: !!state.meta.trainReady, label:"Build your training plan", act:"App.setTab('plan')"},
+    {done: !!state.mealPlan, label:"Create your meal plan", act:"App.setTab('eat')"},
+    {done: state.flog.length>0, label:"Log your first meal", act:"App.setTab('eat')"},
+    {done: state.wlog.length>0, label:"Log your first workout", act:"App.setTab('train')"},
     {done: state.blog.length>0, label:"Add your weight", act:"App.setTab('body')"}
   ];
   if(steps.every(s=>s.done)) return "";
