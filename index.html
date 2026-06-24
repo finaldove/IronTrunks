@@ -1028,7 +1028,7 @@ function viewPlan(){
     if(d.type==="lift"){
       const exs=d.exercises.map((e,idx)=>
         '<div class="ex" style="margin-bottom:8px">'
-        + '<div style="display:flex;align-items:center;gap:8px"><input class="name" value="'+esc(e.name)+'" placeholder="Exercise name" oninput="App.editEx(\''+d.id+'\',\''+e.id+'\',\'name\',this.value)">'
+        + '<div style="display:flex;align-items:center;gap:8px"><input class="name" list="exliblist" value="'+esc(e.name)+'" placeholder="Search or type exercise" oninput="App.editEx(\''+d.id+'\',\''+e.id+'\',\'name\',this.value)">'
         +   '<button class="x" onclick="App.delEx(\''+d.id+'\',\''+e.id+'\')">×</button></div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
         +   '<div class="sr"><input style="width:28px;text-align:center" value="'+esc(e.sets)+'" placeholder="4" oninput="App.editEx(\''+d.id+'\',\''+e.id+'\',\'sets\',this.value)">'
@@ -1056,10 +1056,18 @@ function viewPlan(){
     +   '<div class="mono" style="font-size:11px;color:var(--muted)">'+lifts+' lifting days</div></div>'
     + programPanel()
     + cards
+    + exLibDatalist()
     + '<button class="btn ghost" style="margin-top:4px" onclick="App.resetPlan()">↺ Reset to default program</button>'
     + '</div>';
 }
 
+function exLibDatalist(){
+  const seen={}; let names=[];
+  EXLIB.forEach(e=>{ if(!seen[e.n]){ seen[e.n]=1; names.push(e.n); } });
+  state.customExercises.forEach(c=>{ if(c&&c.n&&!seen[c.n]){ seen[c.n]=1; names.push(c.n); } });
+  names.sort((a,b)=>a.localeCompare(b));
+  return '<datalist id="exliblist">'+names.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
+}
 function buildFoodOptions(q){
   q=(q||"").trim().toLowerCase();
   const hit=n=>!q||n.toLowerCase().indexOf(q)>=0;
