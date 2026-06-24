@@ -24,3 +24,5 @@ stays.
 Stats tab → **Export** saves all your data to a JSON file. **Import** restores
 it. Export before any app update, and now and then for safety (especially on
 iPhone, where the system can clear an unused app's storage).
+
+Thank you!

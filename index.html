@@ -542,7 +542,6 @@ const state = {
   blog: load(K.b, []),
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
-  foodSearch:"", exSearch:"",
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
   profile: load(K.pr, null),
@@ -669,10 +668,12 @@ const App = {
   /* ---- EAT ---- */
   setMeal(m){ state.eatMeal=m; render(); },
   setFood(n){ state.eatFood=n; render(); },
-  filterFoods(q){ state.foodSearch=q; const s=document.getElementById("foodSel"); if(s) s.innerHTML=buildFoodOptions(q); },
-  filterEx(q){ state.exSearch=q; const c=state._exCtx||{dayName:"",names:[],customNames:[]}; const s=document.getElementById("exSel"); if(s) s.innerHTML=buildExOptions(c.dayName,c.names,c.customNames,q); },
-  addFood(){ const fo=resolveFood(state.eatFood); const a=parseFloat(document.getElementById("amt").value);
-    if(!fo || !(a>0)){ toast("Enter an amount"); return; }
+  pickFood(v){ state.eatFood=(v||"").trim(); render(); },
+  pickEx(v){ state.trainEx=(v||"").trim(); render(); },
+  addFood(){ const fo=resolveFood(state.eatFood);
+    if(!fo){ toast("Pick a food from the list"); return; }
+    const a=parseFloat(document.getElementById("amt").value);
+    if(!(a>0)){ toast("Enter an amount"); return; }
     const fac=a/fo.q;
     state.flog.push({ id:uid(), date:TODAY, meal:state.eatMeal, name:fo.n, amount:a, unit:fo.u,
       p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac });
@@ -977,13 +978,10 @@ function trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyE
     exPart='<div class="field" style="margin-top:6px"><input id="cExName" value="'+esc(state.trainCustomName||"")+'" placeholder="e.g. Cable Crossover" oninput="App.setTrainCustomName(this.value)"></div>'
       +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-top:8px"><input type="checkbox" id="cExSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Save to My Exercises for next time</label>';
   } else {
-    const dayOpts=names.length?'<optgroup label="'+esc(day.name)+' plan">'+names.map(n=>'<option '+(n===state.trainEx?'selected':'')+'>'+esc(n)+'</option>').join("")+'</optgroup>':'';
-    const myOpts=customNames.length?'<optgroup label="My Exercises">'+customNames.map(n=>'<option '+(n===state.trainEx?'selected':'')+'>'+esc(n)+'</option>').join("")+'</optgroup>':'';
     const cid=(state.customExercises.find(e=>e.n===state.trainEx)||{}).id;
-    state._exCtx={dayName:day.name, names:names.slice(), customNames:customNames.slice()};
     exPart=hasAnyEx
-      ? '<div class="field" style="margin-top:6px"><input id="exSearch" value="'+esc(state.exSearch||"")+'" placeholder="Search exercises…" oninput="App.filterEx(this.value)"></div>'
-        +'<div class="field" style="margin-top:6px"><select id="exSel" onchange="App.setTrainEx(this.value)">'+buildExOptions(day.name,names,customNames,state.exSearch)+'</select></div>'
+      ? '<div class="field" style="margin-top:6px"><input id="exPick" list="exlist" autocomplete="off" value="'+esc(state.trainEx||"")+'" placeholder="Search exercises…" onchange="App.pickEx(this.value)"></div>'
+        +exDatalist(names,customNames)
         +(exObj?'<div class="hint">Target · '+esc(exObj.sets)+' × '+esc(exObj.reps)+'</div>':'')
         +(selectedExIsCustom?'<button onclick="App.delCustomExercise(\''+cid+'\')" style="background:none;color:var(--muted);font-size:12px;text-decoration:underline;text-align:left;margin-top:6px">Remove “'+esc(state.trainEx)+'” from My Exercises</button>':'')
       : '<div style="color:var(--muted);font-size:14px;margin-top:6px">No exercises here — add them in Plan, or use Custom above.</div>';
@@ -1068,32 +1066,24 @@ function exLibDatalist(){
   names.sort((a,b)=>a.localeCompare(b));
   return '<datalist id="exliblist">'+names.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
 }
-function buildFoodOptions(q){
-  q=(q||"").trim().toLowerCase();
-  const hit=n=>!q||n.toLowerCase().indexOf(q)>=0;
-  const opt=n=>'<option '+(n===state.eatFood?'selected':'')+'>'+esc(n)+'</option>';
-  let html="";
-  if(state.customFoods.length){ const mine=state.customFoods.filter(cf=>hit(cf.n)); if(mine.length) html+='<optgroup label="My Foods">'+mine.map(cf=>opt(cf.n)).join("")+'</optgroup>'; }
-  FOOD_GROUPS.forEach(g=>{ const items=FOODS.filter(x=>x.g===g&&hit(x.n)); if(items.length) html+='<optgroup label="'+esc(g)+'">'+items.map(x=>opt(x.n)).join("")+'</optgroup>'; });
-  return html||'<option disabled>No matches</option>';
+function foodDatalist(){
+  const seen={}; let names=[];
+  state.customFoods.forEach(cf=>{ if(cf&&cf.n&&!seen[cf.n]){ seen[cf.n]=1; names.push(cf.n); } });
+  FOODS.forEach(x=>{ if(!seen[x.n]){ seen[x.n]=1; names.push(x.n); } });
+  return '<datalist id="foodlist">'+names.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
 }
-function buildExOptions(dayName, names, customNames, q){
-  q=(q||"").trim().toLowerCase();
-  const hit=n=>!q||n.toLowerCase().indexOf(q)>=0;
-  const opt=n=>'<option '+(n===state.trainEx?'selected':'')+'>'+esc(n)+'</option>';
-  let html="";
-  const dn=names.filter(hit); if(dn.length) html+='<optgroup label="'+esc(dayName)+' plan">'+dn.map(opt).join("")+'</optgroup>';
-  const cn=customNames.filter(hit); if(cn.length) html+='<optgroup label="My Exercises">'+cn.map(opt).join("")+'</optgroup>';
-  return html||'<option disabled>No matches</option>';
+function exDatalist(names, customNames){
+  const seen={}; let out=[];
+  (names||[]).concat(customNames||[]).forEach(n=>{ if(n&&!seen[n]){ seen[n]=1; out.push(n); } });
+  return '<datalist id="exlist">'+out.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
 }
 function viewEat(){
   const today=state.flog.filter(e=>e.date===TODAY);
   const tot=today.reduce((a,e)=>({p:a.p+e.p,c:a.c+e.c,f:a.f+e.f,s:a.s+e.s,sa:a.sa+e.sa,k:a.k+e.k}),{p:0,c:0,f:0,s:0,sa:0,k:0});
-  if(!resolveFood(state.eatFood)) state.eatFood=FOODS[0].n;
+  if(!state.eatFood) state.eatFood=FOODS[0].n;
   const fo=resolveFood(state.eatFood);
   const selectedIsCustom = !!(fo && fo.custom);
   const mealChips=MEALS.map(m=>'<button class="chip'+(m===state.eatMeal?' on':'')+'" onclick="App.setMeal(\''+m+'\')">'+m+'</button>').join("");
-  const foodOpts=buildFoodOptions(state.foodSearch);
 
   const groups=MEALS.concat(["Other"]).map(m=>({m,items:today.filter(e=>(MEALS.indexOf(e.meal)>=0?e.meal:"Other")===m)})).filter(g=>g.items.length);
   let list = groups.length===0 ? emptyBox("Nothing logged yet. Pick a meal and add a food.")
@@ -1122,12 +1112,12 @@ function viewEat(){
     +     miniLimit("Sugars",tot.s,TARGETS.s)+miniLimit("Sat fat",tot.sa,TARGETS.sa)+'</div>'
     + '</section>'
     + mealPlanCard()
-    + eatFoodCard(fo, foodOpts, selectedIsCustom)
+    + eatFoodCard(fo, selectedIsCustom)
     + quickAddCard()
     + '<section><div class="label">Eaten today</div><div style="margin-top:8px">'+list+'</div></section>'
     + '</div>';
 }
-function eatFoodCard(fo, foodOpts, selectedIsCustom){
+function eatFoodCard(fo, selectedIsCustom){
   const seg='<div style="display:flex;align-items:center;justify-content:space-between">'
     +'<div class="label">Add food</div><div class="seg">'
     +'<button onclick="App.setEatMode(\'list\')" style="'+(state.eatMode!=="custom"?"background:var(--teal);color:var(--ink)":"")+'">List</button>'
@@ -1144,12 +1134,17 @@ function eatFoodCard(fo, foodOpts, selectedIsCustom){
       +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)"><input type="checkbox" id="cSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Save to My Foods for next time</label>'
       +'<button class="btn" onclick="App.addCustom()">+ Add to '+state.eatMeal+'</button>';
   } else {
-    body='<div><div class="label">Food</div>'
-      +'<div class="field" style="margin-top:6px"><input id="foodSearch" value="'+esc(state.foodSearch||"")+'" placeholder="Search foods…" oninput="App.filterFoods(this.value)"></div>'
-      +'<div class="field" style="margin-top:6px"><select id="foodSel" onchange="App.setFood(this.value)">'+foodOpts+'</select></div></div>'
-      +'<div><div class="label">Amount · '+esc(fo.u)+'</div><div class="field" style="margin-top:6px"><input id="amt" class="inp-num" inputmode="decimal" placeholder="'+(fo.u==="g"?"200":"1")+'"></div></div>'
-      +(selectedIsCustom?'<button onclick="App.delCustomFood(\''+fo.id+'\')" style="background:none;color:var(--muted);font-size:12px;text-decoration:underline;text-align:left">Remove “'+esc(fo.n)+'” from My Foods</button>':'')
-      +'<button class="btn" onclick="App.addFood()">+ Add to '+state.eatMeal+'</button>';
+    const head='<div><div class="label">Food</div>'
+      +'<div class="field" style="margin-top:6px"><input id="foodPick" list="foodlist" autocomplete="off" value="'+esc(state.eatFood||"")+'" placeholder="Search foods…" onchange="App.pickFood(this.value)"></div>'
+      +foodDatalist()+'</div>';
+    if(fo){
+      body=head
+        +'<div><div class="label">Amount · '+esc(fo.u)+'</div><div class="field" style="margin-top:6px"><input id="amt" class="inp-num" inputmode="decimal" placeholder="'+(fo.u==="g"?"200":"1")+'"></div></div>'
+        +(selectedIsCustom?'<button onclick="App.delCustomFood(\''+fo.id+'\')" style="background:none;color:var(--muted);font-size:12px;text-decoration:underline;text-align:left">Remove “'+esc(fo.n)+'” from My Foods</button>':'')
+        +'<button class="btn" onclick="App.addFood()">+ Add to '+state.eatMeal+'</button>';
+    } else {
+      body=head+'<div style="font-size:13px;color:var(--muted);margin-top:4px">“'+esc(state.eatFood)+'” isn’t in the list. Tap <b>Custom</b> above to add it with its macros — it’ll then turn up in search.</div>';
+    }
   }
   return '<section class="card stack-sm">'+seg+body+'</section>';
 }
