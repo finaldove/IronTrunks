@@ -179,7 +179,8 @@
 
 <script>
 /* ============================== DATA ============================== */
-const TARGETS = { p:190, c:250, f:70, s:60, sa:27, k:2400 };
+const DEFAULT_TARGETS = { p:190, c:250, f:70, s:60, sa:27, k:2400 };
+let TARGETS = DEFAULT_TARGETS;
 const MEALS = ["Breakfast","Lunch","Dinner","Snack"];
 const FOOD_GROUPS = ["Protein","Carb","Veg & Fruit","Fat & Nuts","Dairy","Konbini & Prepared","Snacks & Sweets","Drinks","Sauce"];
 const FOODS = [
@@ -419,7 +420,7 @@ function makeDefaultPlan(){
 }
 
 /* ============================== STORAGE ============================== */
-const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises" };
+const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan" };
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -443,8 +444,33 @@ const state = {
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
+  profile: load(K.pr, null),
+  mealPlan: load(K.mp, null),
+  setupOpen:false, setupData:null, setupPreview:null,
 };
 save(K.p, state.plan); // lock in default on first run
+
+function applyTargets(){ TARGETS = (state.profile && state.profile.targets) ? state.profile.targets : DEFAULT_TARGETS; }
+applyTargets();
+function isFreshUser(){
+  return !state.profile && state.wlog.length===0 && state.flog.length===0 && state.blog.length===0
+    && state.customFoods.length===0 && state.customExercises.length===0;
+}
+function computeTargets(d){
+  const w=+d.weight, h=+d.height, a=+d.age;
+  const s = d.sex==="female" ? -161 : 5;
+  const bmr = 10*w + 6.25*h - 5*a + s;
+  const AF = {sedentary:1.2, light:1.375, moderate:1.55, active:1.725, athlete:1.9}[d.activity] || 1.55;
+  let cals = bmr*AF, ppk;
+  if(d.goal==="lose"){ cals*=0.80; ppk=2.2; }
+  else if(d.goal==="gain"){ cals*=1.10; ppk=2.0; }
+  else { ppk=1.8; }
+  cals = Math.round(cals/10)*10;
+  const p = Math.round(w*ppk);
+  const f = Math.round(cals*0.25/9);
+  let c = Math.round((cals - p*4 - f*9)/4); if(c<0) c=0;
+  return { p, c, f, s:Math.round(cals*0.10/4), sa:Math.round(cals*0.10/9), k:cals };
+}
 
 let toastTimer=null;
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
@@ -453,6 +479,35 @@ function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg
 /* ============================== APP ACTIONS ============================== */
 const App = {
   setTab(t){ state.tab=t; render(); },
+
+  /* ---- SETUP / PROFILE ---- */
+  openSetup(){ const p=state.profile||{}; const lw=state.blog.slice(-1)[0];
+    state.setupData={ sex:p.sex||"male", age:p.age||"", height:p.height||"", weight:p.weight||(lw?lw.kg:""), activity:p.activity||"moderate", goal:p.goal||"lose", goalWeight:p.goalWeight||"" };
+    state.setupPreview=null; state.setupOpen=true; render(); },
+  closeSetup(){ state.setupOpen=false; state.setupPreview=null; render(); },
+  setSetupNum(k,v){ if(state.setupData) state.setupData[k]=v; },
+  pickSetup(k,v){ if(!state.setupData) return; state.setupData[k]=v; state.setupPreview=null; render(); },
+  calcSetup(){ ["age","height","weight"].forEach(k=>{ const el=document.getElementById("su_"+k); if(el) state.setupData[k]=el.value; });
+    const d=state.setupData; if(!(+d.age>0)||!(+d.height>0)||!(+d.weight>0)){ toast("Enter age, height & weight"); return; }
+    state.setupPreview=computeTargets(d); render(); },
+  saveSetup(){ if(!state.setupPreview){ App.calcSetup(); if(!state.setupPreview) return; }
+    const d=state.setupData;
+    state.profile={ sex:d.sex, age:+d.age, height:+d.height, weight:+d.weight, activity:d.activity, goal:d.goal, goalWeight:(+d.goalWeight>0?+d.goalWeight:null), targets:state.setupPreview, onboarded:true };
+    save(K.pr,state.profile); applyTargets();
+    if(state.blog.length===0 && +d.weight>0){ state.blog.push({id:uid(),date:TODAY,kg:+d.weight}); save(K.b,state.blog); }
+    state.setupOpen=false; state.setupPreview=null; toast("Targets saved"); render(); },
+  skipSetup(){ state.profile={ skipped:true, onboarded:true, targets:DEFAULT_TARGETS }; save(K.pr,state.profile); applyTargets(); state.setupOpen=false; toast("Using default targets"); render(); },
+  setGoalWeight(){ const el=document.getElementById("gwInput"); const v=el?parseFloat(el.value):NaN;
+    if(!(v>0)){ toast("Enter a goal weight"); return; }
+    if(!state.profile) state.profile={ onboarded:true, targets:DEFAULT_TARGETS };
+    state.profile.goalWeight=v; save(K.pr,state.profile); applyTargets(); toast("Goal weight set"); render(); },
+  generatePlan(){ state.mealPlan=buildPlan(); save(K.mp,state.mealPlan); toast("Plan generated"); render(); },
+  clearPlan(){ state.mealPlan=null; save(K.mp,null); render(); },
+  logPlanMeal(key){ const meal={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",snack:"Snack"}[key];
+    const items=state.mealPlan && state.mealPlan.meals[key]; if(!items||!items.length){ toast("Nothing to log"); return; }
+    items.forEach(it=>{ const f=FOOD_BY_NAME[it.name]; if(!f) return; const x=it.amount/f.q;
+      state.flog.push({ id:uid(), date:TODAY, meal:meal, name:f.n, amount:it.amount, unit:f.u, p:f.p*x, c:f.c*x, f:f.f*x, s:f.s*x, sa:f.sa*x, k:f.k*x }); });
+    save(K.f,state.flog); toast("Logged "+meal); render(); },
 
   /* ---- TRAIN ---- */
   liftDays(){ return state.plan.filter(d=>d.type==="lift"); },
@@ -553,9 +608,9 @@ const App = {
 
   /* ---- DATA ---- */
   exportData(){
-    const payload={ app:"IronTrunks", version:2, exportedAt:new Date().toISOString(),
+    const payload={ app:"IronTrunks", version:3, exportedAt:new Date().toISOString(),
       workoutLog:state.wlog, foodLog:state.flog, weightLog:state.blog, trainingPlan:state.plan,
-      customFoods:state.customFoods, customExercises:state.customExercises };
+      customFoods:state.customFoods, customExercises:state.customExercises, profile:state.profile, mealPlan:state.mealPlan };
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob); const a=document.createElement("a");
     a.href=url; a.download="irontrunks-backup-"+TODAY+".json"; document.body.appendChild(a); a.click();
@@ -573,8 +628,10 @@ const App = {
       state.plan=(Array.isArray(d.trainingPlan)&&d.trainingPlan.length)?d.trainingPlan:makeDefaultPlan();
       state.customFoods=Array.isArray(d.customFoods)?d.customFoods:[];
       state.customExercises=Array.isArray(d.customExercises)?d.customExercises:[];
+      state.profile=(d.profile&&typeof d.profile==="object")?d.profile:null;
+      state.mealPlan=(d.mealPlan&&typeof d.mealPlan==="object")?d.mealPlan:null;
       save(K.w,state.wlog); save(K.f,state.flog); save(K.b,state.blog); save(K.p,state.plan);
-      save(K.cf,state.customFoods); save(K.ce,state.customExercises);
+      save(K.cf,state.customFoods); save(K.ce,state.customExercises); save(K.pr,state.profile); save(K.mp,state.mealPlan); applyTargets();
       state.trainDay=null; state.trainEx=null; toast("Backup restored"); render();
     }catch(e){ alert("That file could not be read as an IronTrunks backup."); } };
     reader.readAsText(file);
@@ -583,6 +640,93 @@ const App = {
 window.App = App;
 
 /* ============================== VIEWS ============================== */
+/* ---------- meal plan generator ---------- */
+const PLAN_POOLS = {
+  bProtein:["Whey protein","Greek yogurt","Egg"],
+  bCarb:["Oats (dry)","Bread"],
+  bFruit:["Banana","Apple"],
+  bFat:["Peanut butter","Almonds","Mixed nuts"],
+  lProtein:["Chicken breast","Salmon","Tuna (can)","Beef round","Chicken thigh"],
+  lCarb:["Cooked white rice","Cooked brown rice","Rice (1 bowl ~150g)","Sweet potato"],
+  veg:["Broccoli","Spinach","Cabbage","Carrot","Bean sprouts (moyashi)"],
+  dProtein:["Salmon","Saba (mackerel)","Chicken thigh","Beef round","Cod","Egg"],
+  dCarb:["Cooked white rice","Cooked brown rice","Udon (boiled)","Soba (boiled)","Satoimo (taro)"],
+  sProtein:["Greek yogurt","Whey protein","SAVAS milk protein"],
+  sHealthy:["Almonds","Banana","Apple","Mixed nuts","Edamame (boiled)"],
+  treat:["Chocolate (25g)","Senbei (rice cracker)","Pocky (~half pack)","Dorayaki","Pudding (purin)","Ice cream (cup)","SOYJOY (1 bar)","Dango (1 skewer)"]
+};
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function isCountUnit(u){ return !(u==="g"||u==="ml"); }
+function pMac(name,amount){ const f=FOOD_BY_NAME[name]; if(!f) return {p:0,c:0,f:0,k:0,s:0,sa:0}; const x=amount/f.q; return {p:f.p*x,c:f.c*x,f:f.f*x,k:f.k*x,s:f.s*x,sa:f.sa*x}; }
+function sumMac(items){ return items.reduce((a,it)=>{const m=pMac(it.name,it.amount);return {p:a.p+m.p,c:a.c+m.c,f:a.f+m.f,k:a.k+m.k,s:a.s+m.s,sa:a.sa+m.sa};},{p:0,c:0,f:0,k:0,s:0,sa:0}); }
+function clampAmt(f,u,role){
+  if(isCountUnit(f.u)){ const m = f.u==="scoop"?3:((f.u==="tbsp"||f.u==="tsp")?3:4); return Math.min(m,Math.max(1,u)); }
+  let lo=20,hi=300; if(role==="fat"){lo=0;hi=40;} if(role==="veg"){lo=80;hi=200;}
+  return Math.min(hi,Math.max(lo,u));
+}
+function roundAmt(f,u){ return isCountUnit(f.u) ? Math.max(1,Math.round(u)) : Math.max(0,Math.round(u/5)*5); }
+function setForP(name,gP,role){ const f=FOOD_BY_NAME[name]; let u=f.p>0?gP*f.q/f.p:f.q; return {name,amount:roundAmt(f,clampAmt(f,u,role))}; }
+function setForC(name,gC,role){ const f=FOOD_BY_NAME[name]; let u=f.c>0?gC*f.q/f.c:f.q; return {name,amount:roundAmt(f,clampAmt(f,u,role))}; }
+function setForF(name,gF,role){ const f=FOOD_BY_NAME[name]; let u=f.f>0?gF*f.q/f.f:f.q; return {name,amount:roundAmt(f,clampAmt(f,u,role))}; }
+function planKeep(it){ return it && it.amount>0 && FOOD_BY_NAME[it.name]; }
+function buildPlan(){
+  const T=TARGETS, P=PLAN_POOLS;
+  const sel={ bP:pick(P.bProtein), bC:pick(P.bCarb), bFr:pick(P.bFruit), bFat:pick(P.bFat),
+    lP:pick(P.lProtein), lC:pick(P.lCarb), lV:pick(P.veg),
+    dP:pick(P.dProtein), dC:pick(P.dCarb), dV:pick(P.veg),
+    sP:pick(P.sProtein), sX:(Math.random()<0.6?pick(P.treat):pick(P.sHealthy)) };
+  const bPi=setForP(sel.bP,T.p*0.25,"protein"), lPi=setForP(sel.lP,T.p*0.30,"protein"),
+        dPi=setForP(sel.dP,T.p*0.30,"protein"), sPi=setForP(sel.sP,T.p*0.15,"protein");
+  const bFri={name:sel.bFr,amount:1};
+  const bFati = sel.bFat==="Peanut butter" ? {name:"Peanut butter",amount:1} : {name:sel.bFat,amount:25};
+  const sXi={name:sel.sX,amount:1};
+  const lVi={name:sel.lV,amount:120}, dVi={name:sel.dV,amount:120};
+  let base=[bPi,lPi,dPi,sPi,bFri,bFati,sXi,lVi,dVi].filter(planKeep);
+  let remC=Math.max(0,T.c - sumMac(base).c);
+  const bCi=setForC(sel.bC,remC*0.25,"carb"), lCi=setForC(sel.lC,remC*0.40,"carb"), dCi=setForC(sel.dC,remC*0.35,"carb");
+  let withCarb=base.concat([bCi,lCi,dCi]);
+  let remF=T.f - sumMac(withCarb).f;
+  let lOil=null,dOil=null;
+  if(remF>4){ lOil=setForF("Olive oil",remF*0.5,"fat"); dOil=setForF("Sesame oil",remF*0.5,"fat"); }
+  else if(remF>1){ lOil=setForF("Olive oil",remF,"fat"); }
+  // kcal correction via carb foods
+  let allItems=[bCi,lCi,dCi,bPi,lPi,dPi,sPi,bFri,bFati,sXi,lVi,dVi].concat(lOil?[lOil]:[]).concat(dOil?[dOil]:[]).filter(planKeep);
+  const carbItems=[bCi,lCi,dCi].filter(planKeep); const carbK=sumMac(carbItems).k;
+  if(carbK>50){ let factor=1+(T.k - sumMac(allItems).k)/carbK; factor=Math.min(1.6,Math.max(0.6,factor));
+    carbItems.forEach(ci=>{ const f=FOOD_BY_NAME[ci.name]; ci.amount=roundAmt(f,clampAmt(f,ci.amount*factor,"carb")); }); }
+  const meals={
+    breakfast:[bPi,bCi,bFri,bFati].filter(planKeep),
+    lunch:[lPi,lCi,lVi].concat(lOil?[lOil]:[]).filter(planKeep),
+    dinner:[dPi,dCi,dVi].concat(dOil?[dOil]:[]).filter(planKeep),
+    snack:[sPi,sXi].filter(planKeep)
+  };
+  const tot=sumMac([].concat(meals.breakfast,meals.lunch,meals.dinner,meals.snack));
+  return { meals, tot, ts:Date.now() };
+}
+function mealPlanCard(){
+  const mp=state.mealPlan;
+  if(!mp){ return '<section class="card stack-sm"><div class="label">Meal plan</div>'
+    +'<div class="note-muted">Generate a Breakfast / Lunch / Dinner / Snack plan that hits your targets — keep it here to follow as you log.</div>'
+    +'<button class="btn" onclick="App.generatePlan()">Generate plan</button></section>'; }
+  const order=[["breakfast","Breakfast"],["lunch","Lunch"],["dinner","Dinner"],["snack","Snack"]];
+  const body=order.map(o=>{ const items=mp.meals[o[0]]||[]; const m=sumMac(items);
+    return '<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;align-items:baseline">'
+      +'<div class="gauge-name">'+o[1]+'</div><div class="mono" style="font-size:11px;color:var(--muted)">'+Math.round(m.k)+' kcal · '+Math.round(m.p)+'P</div></div>'
+      +'<div class="stack-sm" style="margin-top:5px">'+items.map(it=>{ const f=FOOD_BY_NAME[it.name];
+         return '<div class="item" style="padding:7px 11px"><div class="min0"><div class="truncate" style="font-size:13px">'+esc(it.name)+'</div></div>'
+           +'<div class="mono" style="font-size:12px;color:var(--gold);white-space:nowrap">'+r1(it.amount)+' '+esc(f.u)+'</div></div>'; }).join("")+'</div>'
+      +'<button class="btn ghost small" style="margin-top:6px;color:var(--text)" onclick="App.logPlanMeal(\''+o[0]+'\')">Log '+o[1]+'</button></div>'; }).join("");
+  const t=mp.tot, T=TARGETS;
+  const summ='<div class="row2" style="margin-top:12px">'
+    +'<div class="stat"><div class="label">Plan kcal</div><div class="v" style="font-size:18px">'+Math.round(t.k)+'<span style="font-size:11px;color:var(--muted)"> / '+T.k+'</span></div></div>'
+    +'<div class="stat"><div class="label">Plan protein</div><div class="v" style="font-size:18px;color:var(--gold)">'+Math.round(t.p)+'<span style="font-size:11px;color:var(--muted)"> / '+T.p+'</span></div></div></div>'
+    +'<div class="note-muted" style="margin-top:4px">'+Math.round(t.c)+'C · '+Math.round(t.f)+'F · estimate — tweak amounts as you log</div>';
+  return '<section class="card stack-sm"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Meal plan</div>'
+    +'<button class="btn ghost small" style="width:auto;padding:5px 12px;color:var(--text)" onclick="App.generatePlan()">↻ New</button></div>'
+    +body+summ
+    +'<button class="btn ghost small" onclick="App.clearPlan()">Clear plan</button></section>';
+}
+
 function macroBar(label, eaten, target, limit){
   const pct = target ? Math.min(100,(eaten/target)*100) : 0;
   let cls="";
@@ -597,6 +741,38 @@ function macroBar(label, eaten, target, limit){
 function emptyBox(t){ return '<div class="empty">'+esc(t)+'</div>'; }
 
 function banner(t, jp){ return '<div class="banner"><span class="t">'+esc(t)+'</span>'+(jp?'<span class="jp">'+jp+'</span>':'')+'</div>'; }
+
+function viewSetup(){
+  if(!state.setupData){ const lw=state.blog.slice(-1)[0]; state.setupData={ sex:"male", age:"", height:"", weight:(lw?lw.kg:""), activity:"moderate", goal:"lose", goalWeight:"" }; }
+  const d=state.setupData, pv=state.setupPreview;
+  const seg=(k,opts)=>'<div class="seg" style="width:100%">'+opts.map(o=>'<button style="flex:1;'+(d[k]===o[0]?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.pickSetup(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join("")+'</div>';
+  const actOpts=[["sedentary","Sedentary (desk, little exercise)"],["light","Light (1-2 sessions/wk)"],["moderate","Moderate (3-4/wk)"],["active","Active (5-6/wk)"],["athlete","Athlete (2x/day)"]];
+  let preview="";
+  if(pv){ preview='<section class="card stack-sm"><div class="label">Your daily targets</div>'
+    +'<div class="row2"><div class="stat"><div class="label">Energy</div><div class="v" style="font-size:24px">'+pv.k+'<span style="font-size:12px;color:var(--muted)"> kcal</span></div></div>'
+    +'<div class="stat"><div class="label">Protein</div><div class="v" style="font-size:24px;color:var(--gold)">'+pv.p+'<span style="font-size:12px;color:var(--muted)"> g</span></div></div></div>'
+    +'<div class="row3"><div class="stat"><div class="label">Carbs</div><div class="v">'+pv.c+'g</div></div><div class="stat"><div class="label">Fat</div><div class="v">'+pv.f+'g</div></div><div class="stat"><div class="label">Sugar cap</div><div class="v">'+pv.s+'g</div></div></div>'
+    +'<button class="btn" onclick="App.saveSetup()">Save &amp; start tracking</button></section>'; }
+  return '<div class="stack" style="padding-top:8px">'
+    + banner("Setup","セットアップ")
+    + '<div class="note-muted" style="margin:-4px 2px 0;line-height:1.5">Enter your details — IronTrunks calculates your daily targets (Mifflin-St Jeor TDEE). Recalculate anytime from the Body tab.</div>'
+    + '<section class="card stack-sm">'
+    +   '<div><div class="label">Sex</div><div style="margin-top:6px">'+seg("sex",[["male","Male"],["female","Female"]])+'</div></div>'
+    +   '<div class="row3">'
+    +     '<div><div class="label">Age</div><div class="field" style="margin-top:6px"><input id="su_age" class="inp-num" inputmode="numeric" value="'+esc(String(d.age||""))+'" placeholder="29" oninput="App.setSetupNum(\'age\',this.value)"></div></div>'
+    +     '<div><div class="label">Height</div><div class="field" style="margin-top:6px"><input id="su_height" class="inp-num" inputmode="numeric" value="'+esc(String(d.height||""))+'" placeholder="182" oninput="App.setSetupNum(\'height\',this.value)"></div></div>'
+    +     '<div><div class="label">Weight</div><div class="field" style="margin-top:6px"><input id="su_weight" class="inp-num" inputmode="decimal" value="'+esc(String(d.weight||""))+'" placeholder="85" oninput="App.setSetupNum(\'weight\',this.value)"></div></div>'
+    +   '</div>'
+    +   '<div class="note-muted" style="margin-top:-4px">Height in cm · weight in kg</div>'
+    +   '<div><div class="label">Activity</div><div class="field" style="margin-top:6px"><select onchange="App.pickSetup(\'activity\',this.value)">'+actOpts.map(o=>'<option value="'+o[0]+'" '+(d.activity===o[0]?"selected":"")+'>'+o[1]+'</option>').join("")+'</select></div></div>'
+    +   '<div><div class="label">Goal</div><div style="margin-top:6px">'+seg("goal",[["lose","Lose fat"],["maintain","Maintain"],["gain","Build"]])+'</div></div>'
+    +   '<div><div class="label">Goal weight kg · optional</div><div class="field" style="margin-top:6px"><input id="su_gw" class="inp-num" inputmode="decimal" value="'+esc(String(d.goalWeight||""))+'" placeholder="e.g. 80" oninput="App.setSetupNum(\'goalWeight\',this.value)"></div></div>'
+    +   '<button class="btn" onclick="App.calcSetup()">Calculate targets</button>'
+    + '</section>'
+    + preview
+    + (state.profile ? '<button class="btn ghost small" onclick="App.closeSetup()">Cancel</button>' : '<button class="btn ghost small" onclick="App.skipSetup()">Skip — use default targets</button>')
+    + '</div>';
+}
 
 function viewHome(){
   const day=App.currentDay();
@@ -783,6 +959,7 @@ function viewEat(){
     +   '<div class="row2" style="padding-top:4px">'
     +     miniLimit("Sugars",tot.s,TARGETS.s)+miniLimit("Sat fat",tot.sa,TARGETS.sa)+'</div>'
     + '</section>'
+    + mealPlanCard()
     + eatFoodCard(fo, foodOpts, selectedIsCustom)
     + quickAddCard()
     + '<section><div class="label">Eaten today</div><div style="margin-top:8px">'+list+'</div></section>'
@@ -834,6 +1011,10 @@ function viewBody(){
     +   '<div class="note-muted">Best first thing, after the toilet, before food.</div>'
     + '</section>'
     + '<section><div class="label">Recent</div><div style="margin-top:8px">'+recent+'</div></section>'
+    + '<section class="card stack-sm"><div class="label">Targets</div>'
+    +   '<div class="note-muted">'+(state.profile && !state.profile.skipped ? 'Goal: '+esc(state.profile.goal)+' · '+TARGETS.k+' kcal · '+TARGETS.p+'P / '+TARGETS.c+'C / '+TARGETS.f+'F' : TARGETS.k+' kcal · '+TARGETS.p+'P / '+TARGETS.c+'C / '+TARGETS.f+'F')+'</div>'
+    +   '<button class="btn ghost small" onclick="App.openSetup()">'+(state.profile?'Recalculate targets':'Set up targets')+'</button>'
+    + '</section>'
     + '</div>';
 }
 
@@ -847,12 +1028,46 @@ function weightSVG(){
   const X=i=> pad + (pts.length===1?(W-2*pad)/2:i*(W-2*pad)/(pts.length-1));
   const Y=v=> H-pad - (v-mn)/(mx-mn)*(H-2*pad);
   function poly(key,col,wd){ return '<polyline fill="none" stroke="'+col+'" stroke-width="'+wd+'" stroke-linejoin="round" points="'+pts.map((p,i)=>X(i)+','+Y(p[key])).join(" ")+'"/>'; }
-  const grid='<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="#2A3742"/>'
-    +'<text x="2" y="'+(Y(mx)+4)+'" fill="#8696A5" font-size="10" font-family="monospace">'+r1(mx)+'</text>'
-    +'<text x="2" y="'+(Y(mn)+4)+'" fill="#8696A5" font-size="10" font-family="monospace">'+r1(mn)+'</text>';
-  const lbls='<text x="'+X(0)+'" y="'+(H-8)+'" fill="#8696A5" font-size="9" font-family="monospace">'+pts[0].lbl+'</text>'
-    +(pts.length>1?'<text x="'+(W-pad)+'" y="'+(H-8)+'" text-anchor="end" fill="#8696A5" font-size="9" font-family="monospace">'+pts[pts.length-1].lbl+'</text>':'');
-  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="xMidYMid meet">'+grid+poly("kg","#8696A5",1.4)+poly("avg","#2DD4BF",2.6)+lbls+'</svg>';
+  const grid='<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="#3C2E36"/>'
+    +'<text x="2" y="'+(Y(mx)+4)+'" fill="#9C8F86" font-size="10" font-family="monospace">'+r1(mx)+'</text>'
+    +'<text x="2" y="'+(Y(mn)+4)+'" fill="#9C8F86" font-size="10" font-family="monospace">'+r1(mn)+'</text>';
+  const lbls='<text x="'+X(0)+'" y="'+(H-8)+'" fill="#9C8F86" font-size="9" font-family="monospace">'+pts[0].lbl+'</text>'
+    +(pts.length>1?'<text x="'+(W-pad)+'" y="'+(H-8)+'" text-anchor="end" fill="#9C8F86" font-size="9" font-family="monospace">'+pts[pts.length-1].lbl+'</text>':'');
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="xMidYMid meet">'+grid+poly("kg","#9C8F86",1.4)+poly("avg","#F1B23E",2.6)+lbls+'</svg>';
+}
+
+function dms(s){ const a=s.split("-"); return new Date(+a[0],+a[1]-1,+a[2]).getTime(); }
+function goalStats(){
+  const blog=state.blog.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const gw = (state.profile && state.profile.goalWeight) ? +state.profile.goalWeight : null;
+  const res={ gw:gw, current:null, latest:null, slopePerWk:null, etaDays:null, etaDate:null };
+  if(!blog.length) return res;
+  res.latest = blog[blog.length-1].kg;
+  const last7=blog.slice(-7); res.current = last7.reduce((a,x)=>a+x.kg,0)/last7.length;
+  let win = blog.filter(x=>dms(x.date) >= Date.now()-28*864e5);
+  if(win.length<2) win = blog.slice(-Math.min(blog.length,6));
+  if(win.length>=2){
+    const t0=dms(win[0].date);
+    const xs=win.map(x=>(dms(x.date)-t0)/864e5), ys=win.map(x=>x.kg);
+    const n=xs.length, sx=xs.reduce((a,b)=>a+b,0), sy=ys.reduce((a,b)=>a+b,0);
+    const sxx=xs.reduce((a,b)=>a+b*b,0), sxy=xs.reduce((a,b,i)=>a+b*ys[i],0);
+    const den=n*sxx-sx*sx, slope = den!==0 ? (n*sxy-sx*sy)/den : 0;
+    res.slopePerWk = slope*7;
+    if(gw!=null){ const need=gw-res.current;
+      if(Math.abs(slope)>0.0005 && Math.sign(slope)===Math.sign(need)){
+        const days=Math.round(need/slope);
+        if(days>0 && days<3650){ res.etaDays=days; res.etaDate=dstr(new Date(Date.now()+days*864e5)); }
+      } }
+  }
+  return res;
+}
+function adherenceStats(){
+  const cut=daysAgo(13), byDay={};
+  state.flog.filter(e=>e.date>=cut).forEach(e=>{ const d=byDay[e.date]||(byDay[e.date]={k:0,p:0}); d.k+=e.k; d.p+=e.p; });
+  const dl=Object.keys(byDay).sort(); let kcalOk=0, protOk=0;
+  dl.forEach(d=>{ const t=byDay[d]; if(t.k>=TARGETS.k*0.9 && t.k<=TARGETS.k*1.1) kcalOk++; if(t.p>=TARGETS.p*0.9) protOk++; });
+  let streak=0; for(let i=dl.length-1;i>=0;i--){ if(byDay[dl[i]].p>=TARGETS.p*0.9) streak++; else break; }
+  return { logged:dl.length, kcalOk, protOk, streak };
 }
 
 function viewStats(){
@@ -869,14 +1084,55 @@ function viewStats(){
         return '<div class="barcol"><div class="barval">'+by[d]+'</div><div class="bar" style="height:'+h+'px"></div><div class="barlabel">'+esc(d.replace("Day ","D"))+'</div></div>';
       }).join("")+'</div>';
 
+  const g=goalStats();
+  let goalCard;
+  if(g.gw==null){
+    goalCard='<section class="card stack-sm"><div class="label">Goal weight</div>'
+      +'<div class="note-muted">Set a target to track progress &amp; projected date.</div>'
+      +'<div style="display:flex;gap:8px"><div class="field" style="flex:1"><input id="gwInput" class="inp-num" inputmode="decimal" placeholder="e.g. 80"></div>'
+      +'<button class="btn small" style="width:auto;padding:0 18px" onclick="App.setGoalWeight()">Set</button></div></section>';
+  } else {
+    const rem = g.current!=null ? r1(Math.abs(g.current-g.gw)) : "—";
+    const rate = g.slopePerWk;
+    const rateStr = rate==null ? "—" : (rate>0?"+":"")+r1(rate)+" kg/wk";
+    const toward = g.current!=null && Math.sign(rate||0)===Math.sign(g.gw-g.current);
+    const rateColor = (rate==null||Math.abs(rate)<0.02) ? "var(--muted)" : (toward?"var(--green)":"var(--red)");
+    const eta = g.etaDate ? ("~ "+md(g.etaDate)+" · "+Math.max(1,Math.round(g.etaDays/7))+" wk") : "no clear trend yet";
+    goalCard='<section class="card stack-sm"><div class="label">Goal · weight</div>'
+      +'<div class="row3">'
+      +'<div class="stat"><div class="label">Now</div><div class="v" style="font-size:22px">'+r1(g.current)+'</div></div>'
+      +'<div class="stat"><div class="label">Goal</div><div class="v" style="font-size:22px;color:var(--gold)">'+r1(g.gw)+'</div></div>'
+      +'<div class="stat"><div class="label">To go</div><div class="v" style="font-size:22px">'+rem+'</div></div></div>'
+      +'<div class="row2">'
+      +'<div class="stat"><div class="label">Rate</div><div class="v" style="font-size:18px;color:'+rateColor+'">'+rateStr+'</div></div>'
+      +'<div class="stat"><div class="label">Projected</div><div class="v" style="font-size:13px">'+eta+'</div></div></div>'
+      +'<div style="display:flex;gap:8px;align-items:center"><div class="note-muted" style="flex:1">Adjust goal weight</div>'
+      +'<div class="field" style="padding:5px 8px;width:78px"><input id="gwInput" class="inp-num" style="font-size:14px" inputmode="decimal" value="'+r1(g.gw)+'"></div>'
+      +'<button class="btn ghost small" style="width:auto;padding:6px 12px;color:var(--text)" onclick="App.setGoalWeight()">Update</button></div>'
+      +'</section>';
+  }
+
+  const ad=adherenceStats();
+  let adCard='<section class="card stack-sm"><div class="label">Adherence · last 14 days</div>';
+  if(ad.logged===0){ adCard+='<div class="note-muted">Log meals to see how often you hit target.</div>'; }
+  else { adCard+='<div class="row3">'
+    +'<div class="stat"><div class="label">kcal on target</div><div class="v" style="font-size:20px">'+ad.kcalOk+'<span style="font-size:12px;color:var(--muted)">/'+ad.logged+'</span></div></div>'
+    +'<div class="stat"><div class="label">Protein hit</div><div class="v" style="font-size:20px;color:var(--gold)">'+ad.protOk+'<span style="font-size:12px;color:var(--muted)">/'+ad.logged+'</span></div></div>'
+    +'<div class="stat"><div class="label">Prot streak</div><div class="v" style="font-size:20px">'+ad.streak+'</div></div></div>'
+    +'<div class="note-muted">'+ad.logged+' logged day'+(ad.logged>1?"s":"")+' · kcal within 10% · protein ≥90% of target</div>'; }
+  adCard+='</section>';
+
   return '<div class="stack">'
     + '<div class="row3">'
     +   '<div class="stat"><div class="label">Sets · 7d</div><div class="v" style="font-size:24px">'+weekSets+'</div></div>'
     +   '<div class="stat"><div class="label">Sessions</div><div class="v" style="font-size:24px">'+weekSessions+'</div></div>'
     +   '<div class="stat"><div class="label">kcal today</div><div class="v" style="font-size:24px;color:var(--teal)">'+kToday+'</div></div>'
     + '</div>'
-    + '<section class="card"><div class="label">Weekly volume · sets by day</div>'+bars+'</section>'
+    + banner("Goal","目標")
+    + goalCard
+    + adCard
     + '<section class="card"><div class="label">Weight trend · kg & 7-day avg</div><div style="margin-top:8px">'+weightSVG()+'</div></section>'
+    + '<section class="card"><div class="label">Weekly volume · sets by day</div>'+bars+'</section>'
     + '<section class="card stack-sm"><div class="label">Backup</div>'
     +   '<div style="font-size:13px;color:var(--muted)">Save a copy of all your data, or restore one. Do this before any app update.</div>'
     +   '<div class="row2"><button class="btn small" style="width:100%" onclick="App.exportData()">Export</button>'
@@ -898,6 +1154,7 @@ const ICONS={
 function render(){
   document.getElementById("todayLabel").textContent=TODAY;
   const main=document.getElementById("main");
+  if(state.setupOpen || isFreshUser()){ main.innerHTML=viewSetup(); document.getElementById("nav").innerHTML=""; return; }
   if(state.tab==="home") main.innerHTML=viewHome();
   else if(state.tab==="train") main.innerHTML=viewTrain();
   else if(state.tab==="plan") main.innerHTML=viewPlan();
