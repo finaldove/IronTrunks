@@ -283,6 +283,7 @@ const FOODS = [
   ["Rice vinegar","Sauce","tbsp",1,0,0.5,0,0,0,7],["Sriracha","Sauce","tbsp",1,0.3,3,0.2,2,0,15],
   ["Curry roux (1 block)","Sauce","block",1,1.3,9,6,1,3,103],["Honey","Sauce","tbsp",1,0,17,0,16,0,65],
   ["Sugar","Sauce","tsp",1,0,4,0,4,0,16],
+  ["Sesame dressing","Sauce","tbsp",1,0.4,3.3,3.8,2,0.5,49],
 ].map(a => ({ n:a[0], g:a[1], u:a[2], q:a[3], p:a[4], c:a[5], f:a[6], s:a[7], sa:a[8], k:a[9] }));
 const FOOD_BY_NAME = Object.fromEntries(FOODS.map(x => [x.n, x]));
 function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:"serving", q:1, p:cf.p, c:cf.c, f:cf.f, s:cf.s, sa:cf.sa, k:cf.k, custom:true, id:cf.id }; }
@@ -756,10 +757,10 @@ const PLAN_POOLS = {
   bFruit:["Banana","Apple"],
   bFat:["Peanut butter","Almonds","Mixed nuts"],
   lProtein:["Chicken breast","Salmon","Tuna (can)","Beef round","Chicken thigh"],
-  lCarb:["Cooked white rice","Cooked brown rice","Rice (1 bowl ~150g)","Sweet potato"],
+  lCarb:["White rice (dry)","Brown rice (dry)","Pasta (dry)","Sweet potato"],
   veg:["Broccoli","Spinach","Cabbage","Carrot","Bean sprouts (moyashi)"],
   dProtein:["Salmon","Saba (mackerel)","Chicken thigh","Beef round","Cod","Egg"],
-  dCarb:["Cooked white rice","Cooked brown rice","Udon (boiled)","Soba (boiled)","Satoimo (taro)"],
+  dCarb:["White rice (dry)","Brown rice (dry)","Soba (boiled)","Satoimo (taro)"],
   sProtein:["Greek yogurt","Whey protein","SAVAS milk protein"],
   sHealthy:["Almonds","Banana","Apple","Mixed nuts","Edamame (boiled)"],
   treat:["Chocolate (25g)","Senbei (rice cracker)","Pocky (~half pack)","Dorayaki","Pudding (purin)","Ice cream (cup)","SOYJOY (1 bar)","Dango (1 skewer)"]
