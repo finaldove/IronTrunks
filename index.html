@@ -520,7 +520,7 @@ function makeDefaultPlan(){
 }
 
 /* ============================== STORAGE ============================== */
-const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan" };
+const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", meta:"il.meta" };
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -532,6 +532,10 @@ function daysAgo(n){ return dstr(new Date(Date.now()-n*864e5)); }
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function r1(n){ return Math.round(n*10)/10; }
 function md(s){ const a=s.split("-"); return a[1]+"/"+a[2]; }
+function shiftDate(s,delta){ const a=s.split("-"); const d=new Date(+a[0],+a[1]-1,+a[2]); d.setDate(d.getDate()+delta); return dstr(d); }
+function dayDiff(a,b){ const x=a.split("-"),y=b.split("-"); return Math.round((new Date(+x[0],+x[1]-1,+x[2])-new Date(+y[0],+y[1]-1,+y[2]))/864e5); }
+function prettyDate(s){ const diff=dayDiff(s,TODAY); if(diff===0) return "Today"; if(diff===-1) return "Yesterday"; if(diff===1) return "Tomorrow";
+  const a=s.split("-"); const d=new Date(+a[0],+a[1]-1,+a[2]); const wd=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]; return wd+" "+(+a[2])+"/"+(+a[1]); }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 /* ============================== STATE ============================== */
@@ -542,6 +546,8 @@ const state = {
   blog: load(K.b, []),
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
+  viewDate:TODAY, editFood:null, editSet:null,
+  meta: load(K.meta, {}),
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
   profile: load(K.pr, null),
@@ -607,7 +613,7 @@ const App = {
   logPlanMeal(key){ const meal={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",snack:"Snack"}[key];
     const items=state.mealPlan && state.mealPlan.meals[key]; if(!items||!items.length){ toast("Nothing to log"); return; }
     items.forEach(it=>{ const f=FOOD_BY_NAME[it.name]; if(!f) return; const x=it.amount/f.q;
-      state.flog.push({ id:uid(), date:TODAY, meal:meal, name:f.n, amount:it.amount, unit:f.u, p:f.p*x, c:f.c*x, f:f.f*x, s:f.s*x, sa:f.sa*x, k:f.k*x }); });
+      state.flog.push({ id:uid(), date:state.viewDate, meal:meal, name:f.n, amount:it.amount, unit:f.u, p:f.p*x, c:f.c*x, f:f.f*x, s:f.s*x, sa:f.sa*x, k:f.k*x }); });
     save(K.f,state.flog); toast("Logged "+meal); render(); },
 
   /* ---- TRAIN ---- */
@@ -621,7 +627,7 @@ const App = {
     const rp=parseInt(document.getElementById("tr").value,10);
     const ex=state.trainEx;
     if(!ex || !(w>=0) || !(rp>0)){ toast("Enter weight & reps"); return; }
-    state.wlog.push({ id:uid(), date:TODAY, day:d.name, focus:d.focus, exercise:ex, weight:w, reps:rp });
+    state.wlog.push({ id:uid(), date:state.viewDate, day:d.name, focus:d.focus, exercise:ex, weight:w, reps:rp });
     save(K.w, state.wlog); toast("Set logged"); render();
   },
   delSet(id){ state.wlog=state.wlog.filter(x=>x.id!==id); save(K.w,state.wlog); render(); },
@@ -634,7 +640,7 @@ const App = {
     const rp=parseInt(document.getElementById("tr").value,10);
     const saveIt=document.getElementById("cExSave").checked;
     if(!name || !(w>=0) || !(rp>0)){ toast("Enter exercise, weight & reps"); return; }
-    state.wlog.push({ id:uid(), date:TODAY, day:d.name, focus:d.focus, exercise:name, weight:w, reps:rp });
+    state.wlog.push({ id:uid(), date:state.viewDate, day:d.name, focus:d.focus, exercise:name, weight:w, reps:rp });
     save(K.w,state.wlog);
     if(saveIt && !state.customExercises.some(x=>x.n.toLowerCase()===name.toLowerCase())){
       state.customExercises.push({ id:uid(), n:name }); save(K.ce,state.customExercises);
@@ -675,7 +681,7 @@ const App = {
     const a=parseFloat(document.getElementById("amt").value);
     if(!(a>0)){ toast("Enter an amount"); return; }
     const fac=a/fo.q;
-    state.flog.push({ id:uid(), date:TODAY, meal:state.eatMeal, name:fo.n, amount:a, unit:fo.u,
+    state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:fo.n, amount:a, unit:fo.u,
       p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac });
     save(K.f,state.flog); toast("Added to "+state.eatMeal); render();
   },
@@ -692,7 +698,7 @@ const App = {
   logParsed(){ const items=state.parsed.filter(it=>it.foodName && it.amount>0);
     if(!items.length){ toast("Nothing to log"); return; }
     items.forEach(it=>{ const fo=resolveFood(it.foodName); if(!fo) return; const fac=it.amount/fo.q;
-      state.flog.push({ id:uid(), date:TODAY, meal:state.eatMeal, name:fo.n, amount:it.amount, unit:fo.u,
+      state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:fo.n, amount:it.amount, unit:fo.u,
         p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac }); });
     save(K.f,state.flog); state.parsed=[]; state.parseInput="";
     toast("Logged "+items.length+" item"+(items.length>1?"s":"")+" to "+state.eatMeal); render(); },
@@ -705,7 +711,7 @@ const App = {
     const saveIt=document.getElementById("cSave").checked;
     if(!name || (kIn<=0 && p<=0 && c<=0 && f<=0)){ toast("Add a name and at least one value"); return; }
     const k = kIn>0 ? kIn : Math.round((4*p)+(4*c)+(9*f));
-    state.flog.push({ id:uid(), date:TODAY, meal:state.eatMeal, name:name, amount:1, unit:"serving", p:p, c:c, f:f, s:0, sa:0, k:k });
+    state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:name, amount:1, unit:"serving", p:p, c:c, f:f, s:0, sa:0, k:k });
     save(K.f,state.flog);
     if(saveIt && !state.customFoods.some(x=>x.n.toLowerCase()===name.toLowerCase())){
       state.customFoods.push({ id:uid(), n:name, p:p, c:c, f:f, s:0, sa:0, k:k }); save(K.cf,state.customFoods);
@@ -714,6 +720,32 @@ const App = {
   },
   delCustomFood(id){ state.customFoods=state.customFoods.filter(x=>x.id!==id); save(K.cf,state.customFoods);
     if(!resolveFood(state.eatFood)) state.eatFood=FOODS[0].n; render(); },
+
+  /* ---- DATE / RECENTS / EDIT / GUIDE ---- */
+  stepDate(delta){ const ns=shiftDate(state.viewDate,delta); if(dayDiff(ns,TODAY)>0) return; state.viewDate=ns; state.editFood=null; state.editSet=null; render(); },
+  gotoToday(){ state.viewDate=TODAY; state.editFood=null; state.editSet=null; render(); },
+  repeatFood(name){ const src=state.flog.filter(e=>e.name===name).slice(-1)[0]; if(!src) return;
+    state.flog.push(Object.assign({}, src, {id:uid(), date:state.viewDate, meal:state.eatMeal}));
+    save(K.f,state.flog); toast("Added "+name+" to "+state.eatMeal); render(); },
+  copyYesterday(){ const prev=shiftDate(state.viewDate,-1); const items=state.flog.filter(e=>e.date===prev);
+    if(!items.length){ toast("Nothing logged "+prettyDate(prev)); return; }
+    items.forEach(e=>state.flog.push(Object.assign({}, e, {id:uid(), date:state.viewDate})));
+    save(K.f,state.flog); toast("Copied "+items.length+" item"+(items.length>1?"s":"")+" from "+prettyDate(prev)); render(); },
+  editFoodStart(id){ state.editFood=id; state.editSet=null; render(); },
+  editFoodSave(id){ const e=state.flog.find(x=>x.id===id); if(!e) return;
+    const a=parseFloat(document.getElementById("ef_"+id).value);
+    if(!(a>0)){ toast("Enter an amount"); return; }
+    const fo=resolveFood(e.name);
+    if(fo){ const fac=a/fo.q; Object.assign(e,{amount:a,unit:fo.u,p:fo.p*fac,c:fo.c*fac,f:fo.f*fac,s:fo.s*fac,sa:fo.sa*fac,k:fo.k*fac}); }
+    else { const r=a/(e.amount||1); Object.assign(e,{amount:a,p:e.p*r,c:e.c*r,f:e.f*r,s:e.s*r,sa:e.sa*r,k:e.k*r}); }
+    save(K.f,state.flog); state.editFood=null; toast("Updated"); render(); },
+  editSetStart(id){ state.editSet=id; state.editFood=null; render(); },
+  editSetSave(id){ const s=state.wlog.find(x=>x.id===id); if(!s) return;
+    const w=parseFloat(document.getElementById("ew_"+id).value); const rp=parseInt(document.getElementById("er_"+id).value,10);
+    if(!(w>=0)||!(rp>0)){ toast("Enter weight & reps"); return; }
+    s.weight=w; s.reps=rp; save(K.w,state.wlog); state.editSet=null; toast("Updated"); render(); },
+  editCancel(){ state.editFood=null; state.editSet=null; render(); },
+  dismissGuide(){ state.meta.guideHidden=true; save(K.meta,state.meta); render(); },
 
   /* ---- BODY ---- */
   saveWeight(){ const v=parseFloat(document.getElementById("kg").value); if(!(v>0)){ toast("Enter your weight"); return; }
@@ -728,7 +760,8 @@ const App = {
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob); const a=document.createElement("a");
     a.href=url; a.download="irontrunks-backup-"+TODAY+".json"; document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },200); toast("Backup downloaded");
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },200);
+    state.meta.lastBackup=Date.now(); save(K.meta,state.meta); toast("Backup downloaded");
   },
   triggerImport(){ document.getElementById("importFile").click(); },
   importData(file){
@@ -853,6 +886,15 @@ function macroBar(label, eaten, target, limit){
     + '<div class="gauge"><div class="gfill '+cls+'" style="width:'+pct+'%"></div></div></div>';
 }
 function emptyBox(t){ return '<div class="empty">'+esc(t)+'</div>'; }
+function dateStepper(){
+  const isToday=state.viewDate===TODAY;
+  const canNext=dayDiff(state.viewDate,TODAY)<0;
+  return '<div style="display:flex;align-items:center;gap:6px;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:6px 8px">'
+    +'<button class="x" style="font-size:18px;width:36px;height:32px" onclick="App.stepDate(-1)">‹</button>'
+    +'<div style="flex:1;text-align:center;font-weight:700;font-size:14px;color:'+(isToday?'var(--text)':'var(--gold)')+'">'+prettyDate(state.viewDate)+'</div>'
+    +'<button class="x" style="font-size:18px;width:36px;height:32px;'+(canNext?'':'opacity:.3;pointer-events:none')+'" onclick="App.stepDate(1)">›</button>'
+    +(isToday?'':'<button class="chip" style="white-space:nowrap" onclick="App.gotoToday()">Today</button>')+'</div>';
+}
 
 function banner(t, jp){ return '<div class="banner"><span class="t">'+esc(t)+'</span>'+(jp?'<span class="jp">'+jp+'</span>':'')+'</div>'; }
 
@@ -926,11 +968,42 @@ function viewHome(){
         +'<div class="mono" style="font-size:15px;font-weight:700;color:var(--gold);white-space:nowrap">'+s.weight+'kg × '+s.reps+'</div></div>').join("")+'</div>';
 
   return '<div class="stack">'
+    + guideCard()
+    + backupNudge()
     + '<div>'+banner("Today's Session","本日の鍛錬")+sessionCard+'</div>'
     + '<div>'+banner("Nutrition","栄養ゲージ")+macroCard+'</div>'
     + '<div>'+banner("Body","体重")+bodyCard+'</div>'
     + '<div>'+banner("Logged Today","記録")+setsList+'</div>'
     + '</div>';
+}
+function guideCard(){
+  if(state.meta.guideHidden) return "";
+  const steps=[
+    {done: !!(state.profile&&state.profile.onboarded), label:"Set your targets", act:"App.openSetup()"},
+    {done: state.flog.length>0, label:"Log a meal", act:"App.setTab('eat')"},
+    {done: state.wlog.length>0, label:"Log a workout set", act:"App.setTab('train')"},
+    {done: state.blog.length>0, label:"Add your weight", act:"App.setTab('body')"}
+  ];
+  if(steps.every(s=>s.done)) return "";
+  return '<section class="card stack-sm" style="border-color:var(--gold)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between"><div class="label" style="color:var(--gold)">Getting started</div>'
+    +'<button class="x" onclick="App.dismissGuide()">×</button></div>'
+    +'<div class="note-muted" style="margin-top:-2px">A few taps to set things up — this card disappears once you\'re done.</div>'
+    + steps.map(s=>'<button style="display:flex;align-items:center;gap:10px;background:none;text-align:left;width:100%;padding:7px 2px" '+(s.done?'':'onclick="'+s.act+'"')+'>'
+        +'<span style="font-size:16px;color:'+(s.done?'var(--green)':'var(--muted)')+'">'+(s.done?'✓':'○')+'</span>'
+        +'<span style="font-size:14px;'+(s.done?'color:var(--muted);text-decoration:line-through':'color:var(--text)')+'">'+s.label+'</span>'
+        +(s.done?'':'<span style="margin-left:auto;color:var(--teal);font-size:18px">›</span>')+'</button>').join("")
+    +'</section>';
+}
+function backupNudge(){
+  const hasData=state.flog.length||state.wlog.length||state.blog.length;
+  if(!hasData) return "";
+  const lb=state.meta.lastBackup;
+  const days=lb?Math.floor((Date.now()-lb)/864e5):null;
+  if(days!==null && days<7) return "";
+  const msg=lb?("Last backup "+days+" day"+(days===1?"":"s")+" ago"):"No backup yet";
+  return '<button class="card" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;border-color:var(--gold)" onclick="App.exportData()">'
+    +'<span style="font-size:13px;color:var(--text)">⤓ '+msg+' — tap to export</span><span class="chip on" style="white-space:nowrap">Export</span></button>';
 }
 
 function viewTrain(){
@@ -948,22 +1021,27 @@ function viewTrain(){
   const exObj=day.exercises.find(e=>e.name===state.trainEx);
   const selectedExIsCustom=!names.includes(state.trainEx) && customNames.includes(state.trainEx);
   const hasAnyEx=names.length || customNames.length;
-  const today=state.wlog.filter(s=>s.date===TODAY);
+  const today=state.wlog.filter(s=>s.date===state.viewDate);
+  const dayWord=state.viewDate===TODAY?"today":prettyDate(state.viewDate);
 
   let chips=ld.map(d=>'<button class="chip'+(d.id===day.id?' on':'')+'" onclick="App.setTrainDay(\''+d.id+'\')">'+esc(d.name)+'</button>').join("");
 
   let list = today.length===0 ? emptyBox("No sets yet. Pick an exercise and log your first.")
     : '<div class="stack-sm">'+today.slice().reverse().map(s=>
-        '<div class="item"><div class="min0"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(s.exercise)+'</div>'
-        +'<div class="note-muted">'+esc(s.day)+'</div></div>'
+        state.editSet===s.id
+        ? '<div class="item"><div class="min0"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(s.exercise)+'</div>'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><input id="ew_'+s.id+'" class="inp-num" inputmode="decimal" value="'+s.weight+'" style="max-width:64px"><span class="mono" style="font-size:11px;color:var(--muted)">kg ×</span><input id="er_'+s.id+'" class="inp-num" inputmode="numeric" value="'+s.reps+'" style="max-width:56px"></div></div>'
+          +'<div style="display:flex;align-items:center;gap:6px"><button class="chip on" onclick="App.editSetSave(\''+s.id+'\')">✓</button><button class="chip" onclick="App.editCancel()">✕</button></div></div>'
+        : '<div class="item"><div class="min0" onclick="App.editSetStart(\''+s.id+'\')" style="cursor:pointer"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(s.exercise)+'</div>'
+        +'<div class="note-muted">'+esc(s.day)+' · tap to edit</div></div>'
         +'<div style="display:flex;align-items:center;gap:8px"><div class="mono" style="font-size:15px;font-weight:700;color:var(--teal);white-space:nowrap">'+s.weight+'kg × '+s.reps+'</div>'
         +'<button class="x" onclick="App.delSet(\''+s.id+'\')">×</button></div></div>').join("")+'</div>';
 
   return '<div class="stack">'
-    + '<section>'+banner("Today's Session","本日の鍛錬")+'<div class="chips">'+chips+'</div>'
+    + '<section class="stack-sm">'+dateStepper()+banner("Today's Session","本日の鍛錬")+'<div class="chips">'+chips+'</div>'
     + '<div style="margin-top:8px;font-size:13px;color:var(--muted)">'+esc(day.focus)+'</div></section>'
     + trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyEx)
-    + '<section><div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Logged today</div>'
+    + '<section><div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Logged '+esc(dayWord)+'</div>'
     +   '<div class="mono" style="font-size:12px;color:var(--muted)">'+today.length+' sets</div></div>'+list+'</section>'
     + '</div>';
 }
@@ -1066,6 +1144,7 @@ function exLibDatalist(){
   names.sort((a,b)=>a.localeCompare(b));
   return '<datalist id="exliblist">'+names.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
 }
+function recentFoods(){ const seen={}, out=[]; for(let i=state.flog.length-1;i>=0 && out.length<8;i--){ const n=state.flog[i].name; if(!seen[n]){ seen[n]=1; out.push(n); } } return out; }
 function foodDatalist(){
   const seen={}; let names=[];
   state.customFoods.forEach(cf=>{ if(cf&&cf.n&&!seen[cf.n]){ seen[cf.n]=1; names.push(cf.n); } });
@@ -1078,7 +1157,8 @@ function exDatalist(names, customNames){
   return '<datalist id="exlist">'+out.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
 }
 function viewEat(){
-  const today=state.flog.filter(e=>e.date===TODAY);
+  const today=state.flog.filter(e=>e.date===state.viewDate);
+  const dayWord=state.viewDate===TODAY?"today":prettyDate(state.viewDate);
   const tot=today.reduce((a,e)=>({p:a.p+e.p,c:a.c+e.c,f:a.f+e.f,s:a.s+e.s,sa:a.sa+e.sa,k:a.k+e.k}),{p:0,c:0,f:0,s:0,sa:0,k:0});
   if(!state.eatFood) state.eatFood=FOODS[0].n;
   const fo=resolveFood(state.eatFood);
@@ -1092,17 +1172,21 @@ function viewEat(){
           +'<div style="text-transform:uppercase;letter-spacing:.16em;font-size:11px;color:var(--teal);font-weight:700">'+g.m+'</div>'
           +'<div class="mono" style="font-size:11px;color:var(--muted)">'+Math.round(sub.k)+' kcal · '+r1(sub.p)+'P</div></div>'
           +'<div class="stack-sm">'+g.items.slice().reverse().map(e=>
-            '<div class="item"><div class="min0"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(e.name)+'</div>'
-            +'<div class="mono" style="font-size:10.5px;color:var(--muted)">'+r1(e.amount)+' '+esc(e.unit)+' · '+Math.round(e.k)+' kcal</div></div>'
+            state.editFood===e.id
+            ? '<div class="item"><div class="min0"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(e.name)+'</div>'
+              +'<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><input id="ef_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.amount)+'" style="max-width:90px"><span class="mono" style="font-size:11px;color:var(--muted)">'+esc(e.unit)+'</span></div></div>'
+              +'<div style="display:flex;align-items:center;gap:6px"><button class="chip on" onclick="App.editFoodSave(\''+e.id+'\')">✓</button><button class="chip" onclick="App.editCancel()">✕</button></div></div>'
+            : '<div class="item"><div class="min0" onclick="App.editFoodStart(\''+e.id+'\')" style="cursor:pointer"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(e.name)+'</div>'
+            +'<div class="mono" style="font-size:10.5px;color:var(--muted)">'+r1(e.amount)+' '+esc(e.unit)+' · '+Math.round(e.k)+' kcal · tap to edit</div></div>'
             +'<div style="display:flex;align-items:center;gap:8px"><div class="mono" style="font-size:12px;color:var(--teal);font-weight:700;white-space:nowrap">'+r1(e.p)+'P</div>'
             +'<button class="x" onclick="App.delFood(\''+e.id+'\')">×</button></div></div>').join("")+'</div></div>';
       }).join("");
 
   return '<div class="stack">'
     + banner("Nutrition","栄養ゲージ")
-    + '<section><div class="label">Logging to</div><div class="chips">'+mealChips+'</div></section>'
+    + '<section class="stack-sm">'+dateStepper()+'<div class="label">Logging to</div><div class="chips">'+mealChips+'</div></section>'
     + '<section class="card stack-sm">'
-    +   '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Today vs target</div>'
+    +   '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">'+(state.viewDate===TODAY?"Today":esc(prettyDate(state.viewDate)))+' vs target</div>'
     +     '<div class="mono" style="font-size:12px;color:var(--muted)">'+today.length+' items</div></div>'
     +   macroBar("Protein g",tot.p,TARGETS.p,false)
     +   macroBar("Carbs g",tot.c,TARGETS.c,false)
@@ -1114,7 +1198,9 @@ function viewEat(){
     + mealPlanCard()
     + eatFoodCard(fo, selectedIsCustom)
     + quickAddCard()
-    + '<section><div class="label">Eaten today</div><div style="margin-top:8px">'+list+'</div></section>'
+    + '<section><div style="display:flex;align-items:center;justify-content:space-between"><div class="label">Eaten '+esc(dayWord)+'</div>'
+    +   '<button class="chip" onclick="App.copyYesterday()">⧉ Copy '+(state.viewDate===TODAY?"yesterday":"prev day")+'</button></div>'
+    +   '<div style="margin-top:8px">'+list+'</div></section>'
     + '</div>';
 }
 function eatFoodCard(fo, selectedIsCustom){
@@ -1134,9 +1220,12 @@ function eatFoodCard(fo, selectedIsCustom){
       +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)"><input type="checkbox" id="cSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Save to My Foods for next time</label>'
       +'<button class="btn" onclick="App.addCustom()">+ Add to '+state.eatMeal+'</button>';
   } else {
+    const rec=recentFoods();
     const head='<div><div class="label">Food</div>'
       +'<div class="field" style="margin-top:6px"><input id="foodPick" list="foodlist" autocomplete="off" value="'+esc(state.eatFood||"")+'" placeholder="Search foods…" onchange="App.pickFood(this.value)"></div>'
-      +foodDatalist()+'</div>';
+      +foodDatalist()
+      +(rec.length?'<div style="margin-top:8px"><div class="label" style="margin-bottom:4px">Recent · tap to re-add</div><div class="chips">'+rec.map(n=>'<button class="chip" data-n="'+esc(n)+'" onclick="App.repeatFood(this.dataset.n)">'+esc(n)+'</button>').join("")+'</div></div>':'')
+      +'</div>';
     if(fo){
       body=head
         +'<div><div class="label">Amount · '+esc(fo.u)+'</div><div class="field" style="margin-top:6px"><input id="amt" class="inp-num" inputmode="decimal" placeholder="'+(fo.u==="g"?"200":"1")+'"></div></div>'
