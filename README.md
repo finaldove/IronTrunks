@@ -17,9 +17,3 @@ stays.
 Stats tab → **Export** saves all your data to a JSON file. **Import** restores
 it. Export before any app update, and now and then for safety (especially on
 iPhone, where the system can clear an unused app's storage).
-
-## Updating later
-Replace `index.html` (and bump the cache name in `sw.js`, e.g. `-v2`) in the
-repo. Export your data first, update, then Import if anything looks empty.
-Your logged data is stored separately from the app files, so updates don't
-erase it.
