@@ -1125,10 +1125,10 @@ function viewHome(){
 
   return '<div class="stack">'
     + guideCard()
-    + backupNudge()
     + banner("Today","本日")
     + glance
     + setsList
+    + remindersCard()
     + '</div>';
 }
 function macroMini(tot,T){
@@ -1160,15 +1160,31 @@ function guideCard(){
         +(s.done?'':'<span style="margin-left:auto;color:var(--teal);font-size:18px">›</span>')+'</button>').join("")
     +'</section>';
 }
-function backupNudge(){
+function remindersCard(){
   const hasData=state.flog.length||state.wlog.length||state.blog.length;
   if(!hasData) return "";
+  const isIOS=/ip(hone|ad|od)/i.test((typeof navigator!=="undefined"&&navigator.userAgent)||"");
+  const RECO=isIOS?7:30;
   const lb=state.meta.lastBackup;
   const days=lb?Math.floor((Date.now()-lb)/864e5):null;
-  if(days!==null && days<7) return "";
-  const msg=lb?("Last backup "+days+" day"+(days===1?"":"s")+" ago"):"No backup yet";
-  return '<button class="card" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;border-color:var(--gold)" onclick="App.exportData()">'
-    +'<span style="font-size:13px;color:var(--text)">⤓ '+msg+' — tap to export</span><span class="chip on" style="white-space:nowrap">Export</span></button>';
+  const due=(lb==null)||(days>=RECO);
+  if(!isIOS && !due) return "";            // non-iPhone: only nudge when actually due
+  let color,head,sub;
+  if(lb==null){ color=isIOS?"var(--red)":"var(--gold)"; head="No backup yet"; sub="Export now to keep a safe copy of your data."; }
+  else if(days<RECO){ color="var(--green)"; head="Backed up "+(days===0?"today":days+" day"+(days===1?"":"s")+" ago"); sub="Next recommended in "+(RECO-days)+" day"+((RECO-days)===1?"":"s")+"."; }
+  else if(days<RECO*2){ color="var(--gold)"; head="Backup due"; sub="Last export "+days+" days ago — a good time to save one."; }
+  else { color="var(--red)"; head="Backup overdue"; sub=days+" days since your last export — please export soon."; }
+  const why=isIOS
+    ? "You're on iPhone/iPad, where the system can clear an installed app's storage when space runs low or the app sits unused — so export about once a week."
+    : "Your device rarely clears app storage, so this is just good practice — roughly monthly is plenty. (iPhone users should back up weekly.)";
+  return '<section class="card stack-sm">'
+    + '<div class="label">Reminders</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+    +   '<div class="min0"><div style="font-weight:700;font-size:14px;color:'+color+'">⤓ '+head+'</div>'
+    +   '<div class="note-muted">'+sub+'</div></div>'
+    +   '<button class="btn small" style="width:auto;padding:8px 16px" onclick="App.exportData()">Export</button></div>'
+    + '<div class="note-muted" style="font-size:11px;line-height:1.45">Export saves all your training, food and weight data to a file you can re-import on any device. '+why+'</div>'
+    + '</section>';
 }
 
 function lastWeight(name){ for(let i=state.wlog.length-1;i>=0;i--){ if(state.wlog[i].exercise===name) return state.wlog[i].weight; } return ""; }
