@@ -526,8 +526,8 @@ function buildProgram(opts){
 function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
-const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", meta:"il.meta" };
-const APP_VERSION = "v23";
+const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
+const APP_VERSION = "v24";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -561,6 +561,8 @@ const state = {
   customExercises: load(K.ce, []),
   profile: load(K.pr, null),
   mealPlan: load(K.mp, null),
+  mealPlans: load(K.mpl, []),
+  planLibOpen:false, planLibManage:false,
   setupOpen:false, setupData:null, setupPreview:null,
   progOpen:false, progData:null,
 };
@@ -624,6 +626,44 @@ const App = {
   buildOwnPlan(){ state.mealPlan={meals:{breakfast:[],lunch:[],dinner:[],snack:[]},tot:{p:0,c:0,f:0,k:0,s:0,sa:0},ts:Date.now()}; state.planEdit=true; state.expand.plan=true; state.mealPrefsOpen=false; save(K.mp,state.mealPlan); render(); },
   togglePlanEdit(){ state.planEdit=!state.planEdit; state.planNewFood=null; render(); },
   planRecompute(){ const mp=state.mealPlan; if(!mp) return; const all=[].concat(mp.meals.breakfast||[],mp.meals.lunch||[],mp.meals.dinner||[],mp.meals.snack||[]); const t=sumMac(all); mp.tot={p:t.p,c:t.c,f:t.f,k:t.k,s:t.s,sa:t.sa}; save(K.mp,mp); },
+
+  openSaveLib(){ if(!state.mealPlan){ toast("Build or generate a plan first"); return; } state.planLibOpen=true; render(); },
+  closeSaveLib(){ state.planLibOpen=false; render(); },
+  togglePlanLibManage(){ state.planLibManage=!state.planLibManage; render(); },
+  saveMealPlanLib(){
+    const nameEl=document.getElementById("mplName");
+    const name=((nameEl&&nameEl.value)||"").trim();
+    if(!name){ toast("Enter a name"); return; }
+    const meals=JSON.parse(JSON.stringify(state.mealPlan.meals));
+    const all=[].concat(meals.breakfast||[],meals.lunch||[],meals.dinner||[],meals.snack||[]);
+    const tot=sumMac(all);
+    const existing=state.mealPlans.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(existing){
+      if(!confirm('A saved plan named "'+name+'" already exists. Overwrite it?')) return;
+      existing.meals=meals; existing.tot=tot; existing.ts=Date.now();
+    } else {
+      state.mealPlans.push({ id:uid(), name, meals, tot, ts:Date.now() });
+    }
+    save(K.mpl,state.mealPlans); state.planLibOpen=false; toast('Saved "'+name+'"'); render();
+  },
+  loadPlanFromLib(id){
+    if(!id) return;
+    const lib=state.mealPlans.find(p=>p.id===id);
+    if(!lib) return;
+    if(state.mealPlan && !confirm('Load "'+lib.name+'"? This replaces your current active plan.')) return;
+    const meals=JSON.parse(JSON.stringify(lib.meals));
+    const all=[].concat(meals.breakfast||[],meals.lunch||[],meals.dinner||[],meals.snack||[]);
+    state.mealPlan={ meals, tot:sumMac(all), ts:Date.now() };
+    state.planEdit=false; state.planNewFood=null; state.expand.plan=true;
+    save(K.mp,state.mealPlan); toast('Loaded "'+lib.name+'"'); render();
+  },
+  renameLibPlan(id,v){ const p=state.mealPlans.find(x=>x.id===id); if(p){ p.name=v; App.saveLibSoon(); } },
+  saveLibSoon(){ clearTimeout(App._libT); App._libT=setTimeout(()=>save(K.mpl,state.mealPlans),400); },
+  deleteLibPlan(id){
+    const p=state.mealPlans.find(x=>x.id===id); if(!p) return;
+    if(!confirm('Delete saved plan "'+p.name+'"? This cannot be undone.')) return;
+    state.mealPlans=state.mealPlans.filter(x=>x.id!==id); save(K.mpl,state.mealPlans); render();
+  },
   setPlanAmount(meal,idx,v){ const a=parseFloat(v); const mp=state.mealPlan; if(!mp||!mp.meals[meal]||!mp.meals[meal][idx]) return; if(a>0){ mp.meals[meal][idx].amount=a; App.planRecompute(); render(); } },
   removePlanFood(meal,idx){ const mp=state.mealPlan; if(!mp||!mp.meals[meal]) return; mp.meals[meal].splice(idx,1); App.planRecompute(); render(); },
   addPlanFood(meal){ const nameEl=document.getElementById("pf_"+meal), amtEl=document.getElementById("pa_"+meal);
@@ -822,9 +862,9 @@ const App = {
 
   /* ---- DATA ---- */
   exportData(){
-    const payload={ app:"IronTrunks", version:3, exportedAt:new Date().toISOString(),
+    const payload={ app:"IronTrunks", version:4, exportedAt:new Date().toISOString(),
       workoutLog:state.wlog, foodLog:state.flog, weightLog:state.blog, trainingPlan:state.plan,
-      customFoods:state.customFoods, customExercises:state.customExercises, profile:state.profile, mealPlan:state.mealPlan };
+      customFoods:state.customFoods, customExercises:state.customExercises, profile:state.profile, mealPlan:state.mealPlan, mealPlans:state.mealPlans };
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob); const a=document.createElement("a");
     a.href=url; a.download="irontrunks-backup-"+TODAY+".json"; document.body.appendChild(a); a.click();
@@ -847,8 +887,9 @@ const App = {
       state.customExercises=Array.isArray(d.customExercises)?d.customExercises:[];
       state.profile=(d.profile&&typeof d.profile==="object")?d.profile:null;
       state.mealPlan=(d.mealPlan&&typeof d.mealPlan==="object")?d.mealPlan:null;
+      state.mealPlans=Array.isArray(d.mealPlans)?d.mealPlans:[];
       save(K.w,state.wlog); save(K.f,state.flog); save(K.b,state.blog); save(K.p,state.plan);
-      save(K.cf,state.customFoods); save(K.ce,state.customExercises); save(K.pr,state.profile); save(K.mp,state.mealPlan); applyTargets();
+      save(K.cf,state.customFoods); save(K.ce,state.customExercises); save(K.pr,state.profile); save(K.mp,state.mealPlan); save(K.mpl,state.mealPlans); applyTargets();
       state.trainDay=null; state.trainEx=null; render();
       const miss=missingPlanFoods();
       toast(miss.length ? ("Restored · "+miss.length+" plan food"+(miss.length>1?"s":"")+" need macros (Eat tab)") : "Backup restored");
@@ -965,15 +1006,41 @@ function mealPrefsForm(){
     +'<div class="note-muted">Built to hit your targets ('+TARGETS.k+' kcal · '+TARGETS.p+'P). Tweak any amount afterwards.</div>'
     +'<button class="btn" onclick="App.generatePlan()">Generate meal plan</button></section>';
 }
+function mealPlanLibCard(){
+  const lib=state.mealPlans||[];
+  if(!lib.length && !state.mealPlan) return "";
+  const opts='<option value="">'+(lib.length?"Load a saved plan…":"No saved plans yet")+'</option>'
+    + lib.map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+Math.round(p.tot.k)+' kcal</option>').join("");
+  const saveRow = state.planLibOpen
+    ? '<div style="display:flex;gap:6px;align-items:center;margin-top:6px">'
+        +'<input id="mplName" placeholder="e.g. Sodium Cut Day 1" style="flex:2" autofocus>'
+        +'<button class="btn small" style="width:auto;padding:8px 12px" onclick="App.saveMealPlanLib()">Save</button>'
+        +'<button class="btn small ghost" style="width:auto;padding:8px 12px;color:var(--text)" onclick="App.closeSaveLib()">✕</button></div>'
+    : '<div class="row2" style="margin-top:6px">'
+        +'<button class="btn small ghost" style="width:100%;color:var(--text)" onclick="App.openSaveLib()">💾 Save current as…</button>'
+        +(lib.length?'<button class="btn small ghost" style="width:100%;color:var(--text)" onclick="App.togglePlanLibManage()">'+(state.planLibManage?"Hide list":"Manage ("+lib.length+")")+'</button>':'')
+      +'</div>';
+  const manage = (state.planLibManage && lib.length) ? '<div class="stack-sm" style="margin-top:6px">'
+    + lib.map(p=>'<div class="item" style="padding:7px 10px"><div class="min0">'
+        +'<input value="'+esc(p.name)+'" oninput="App.renameLibPlan(\''+p.id+'\',this.value)" style="background:transparent;border:none;color:var(--text);font-size:13px;width:100%;padding:0">'
+        +'<div class="note-muted" style="font-size:11px">'+Math.round(p.tot.k)+' kcal · '+Math.round(p.tot.p)+'P</div></div>'
+        +'<div style="display:flex;gap:4px"><button class="chip" onclick="App.loadPlanFromLib(\''+p.id+'\')">Load</button>'
+        +'<button class="x" onclick="App.deleteLibPlan(\''+p.id+'\')">×</button></div></div>').join("")
+    + '</div>' : '';
+  return '<section class="card stack-sm"><div class="label">Saved plans</div>'
+    + '<div class="field"><select onchange="App.loadPlanFromLib(this.value)">'+opts+'</select></div>'
+    + saveRow + manage + '</section>';
+}
 function mealPlanPanel(){
   if(state.mealPrefsOpen) return mealPrefsForm();
+  const lib=mealPlanLibCard();
   if(!state.mealPlan){
-    return '<section class="card stack-sm"><div class="label">Meal plan</div>'
+    return lib + '<section class="card stack-sm"><div class="label">Meal plan</div>'
       +'<div class="note-muted">Generate a day of meals that hits your targets, or build your own meal by meal.</div>'
       +'<div class="row2"><button class="btn small" style="width:100%" onclick="App.openMealPrefs()">Generate</button>'
       +'<button class="btn small ghost" style="width:100%;color:var(--text)" onclick="App.buildOwnPlan()">Build your own</button></div></section>';
   }
-  return expander('plan','Meal plan', state.planEdit?'Editing — tap to collapse':'Tap to view, edit & log', mealPlanCard);
+  return lib + expander('plan','Meal plan', state.planEdit?'Editing — tap to collapse':'Tap to view, edit & log', mealPlanCard);
 }
 function mealPlanCard(){
   const mp=state.mealPlan;
