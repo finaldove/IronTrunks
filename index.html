@@ -1143,7 +1143,7 @@ function guideCard(){
   if(state.meta.guideHidden) return "";
   const steps=[
     {done: !!(state.profile&&state.profile.onboarded), label:"Set your targets", act:"App.openSetup()"},
-    {done: !!state.meta.trainReady, label:"Build your training plan", act:"App.setTab('plan')"},
+    {done: !!state.meta.trainReady || state.plan.some(function(d){ return d.exercises && d.exercises.length; }), label:"Build your training plan", act:"App.setTab('plan')"},
     {done: !!state.mealPlan, label:"Create your meal plan", act:"App.setTab('eat')"},
     {done: state.flog.length>0, label:"Log your first meal", act:"App.setTab('eat')"},
     {done: state.wlog.length>0, label:"Log your first workout", act:"App.setTab('train')"},
