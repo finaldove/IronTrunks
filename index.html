@@ -218,7 +218,7 @@ const FOODS = [
   ["Beef (fatty, sliced)","Protein","g",100,14.4,0.3,33,0,12,338],
 
   /* Carb — rice, noodles, mochi, imo */
-  ["Cooked white rice","Carb","g",100,2.5,37,0.3,0,0.1,156],["Cooked brown rice","Carb","g",100,2.8,35.6,1,0,0.2,165],
+  ["Cooked white rice","Carb","g",100,2.5,37,0.3,0,0.1,156],
   ["Rice (1 bowl ~150g)","Carb","bowl",1,3.8,55.5,0.5,0,0.2,234],["Mochi","Carb","piece",1,2,25.4,0.3,0,0.1,112],
   ["Udon (boiled)","Carb","g",100,2.6,21.6,0.4,0,0.1,95],["Soba (boiled)","Carb","g",100,4.8,26,1,0,0.2,130],
   ["Somen (boiled)","Carb","g",100,3.5,25.8,0.4,0,0.1,114],["Ramen noodles (fresh, boiled)","Carb","g",100,4.9,27.9,1.6,0,0.4,149],
@@ -295,12 +295,33 @@ const FOODS = [
 ].map(a => ({ n:a[0], g:a[1], u:a[2], q:a[3], p:a[4], c:a[5], f:a[6], s:a[7], sa:a[8], k:a[9] }));
 const FOOD_BY_NAME = Object.fromEntries(FOODS.map(x => [x.n, x]));
 function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:cf.u||"serving", q:cf.q||1, p:cf.p, c:cf.c, f:cf.f, s:cf.s||0, sa:cf.sa||0, k:cf.k, custom:true, id:cf.id }; }
-function resolveFood(name){ if(FOOD_BY_NAME[name]) return FOOD_BY_NAME[name]; for(var i=0;i<state.customFoods.length;i++){ if(state.customFoods[i].n===name) return customAsFood(state.customFoods[i]); } return null; }
+function resolveFood(name){
+  if(FOOD_BY_NAME[name]) return FOOD_BY_NAME[name];
+  for(var i=0;i<state.customFoods.length;i++){ if(state.customFoods[i].n===name) return customAsFood(state.customFoods[i]); }
+  var k=normKey(name); if(!k) return null;
+  if(NORM_BY_KEY[k]) return NORM_BY_KEY[k];
+  var cm=state.customFoods.filter(function(cf){ return normKey(cf.n)===k; });
+  if(cm.length===1) return customAsFood(cm[0]);
+  return null;
+}
+/* Ingredient name matcher: collapses case, punctuation, word order & filler words so
+   naming variants ("Brown rice (cooked)" == "Cooked brown rice") resolve to the same
+   food. Distinguishing words (dry/cooked/raw/skinless/silken…) are preserved, and a
+   normalized name only auto-matches when it maps to EXACTLY ONE food, so different items
+   that share words (e.g. サラダチキン vs a chicken salad) never collide. */
+const NORM_STOP = { a:1, an:1, the:1, of:1, with:1, and:1 };
+function normKey(name){
+  return String(name==null?"":name).toLowerCase().replace(/&/g," and ")
+    .replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(function(w){ return w && !NORM_STOP[w]; }).sort().join(" ");
+}
+const NORM_BY_KEY = (function(){ var cnt={}, last={};
+  FOODS.forEach(function(f){ var k=normKey(f.n); if(!k) return; cnt[k]=(cnt[k]||0)+1; last[k]=f; });
+  var out={}; Object.keys(last).forEach(function(k){ if(cnt[k]===1) out[k]=last[k]; }); return out; })();
 
 /* ---------- offline meal parser ---------- */
 const NUMW={a:1,an:1,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,half:0.5,couple:2,few:3};
 const ALIAS=[
-  ["brown rice","Cooked brown rice"],["white rice","Cooked white rice"],["fried rice","Cooked white rice"],
+  ["brown rice","Brown rice (cooked)"],["white rice","Cooked white rice"],["fried rice","Cooked white rice"],
   ["bowl rice","Rice (1 bowl ~150g)"],["rice bowl","Rice (1 bowl ~150g)"],["gohan","Cooked white rice"],["rice","Cooked white rice"],
   ["chicken breast","Chicken breast"],["chicken thigh","Chicken thigh"],["salad chicken","Salad chicken (konbini)"],["fried chicken","Karaage (fried chicken)"],["karaage","Karaage (fried chicken)"],["chicken","Chicken breast"],
   ["greek yogurt","Greek yogurt"],["greek yoghurt","Greek yogurt"],["yogurt","Yogurt (plain)"],["yoghurt","Yogurt (plain)"],
