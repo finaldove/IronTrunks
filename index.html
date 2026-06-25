@@ -494,34 +494,11 @@ function buildProgram(opts){
   return plan;
 }
 
-function makeDefaultPlan(){
-  return [
-    { id:uid(), name:"Day 1", focus:"Back & Rear Delts · width", type:"lift", note:"", exercises:[
-      E("Pull-ups (or assisted)","4","6-8"), E("Lat Pulldown (wide grip)","3","10-12"),
-      E("Chest-Supported Row","4","8-10"), E("Straight-Arm Pulldown","3","12-15"),
-      E("Rear Delt Flyes","3","15-20"), E("Face Pulls","3","15") ] },
-    { id:uid(), name:"Day 2", focus:"Shoulders & Chest", type:"lift", note:"", exercises:[
-      E("Overhead Press","4","6-8"), E("Lateral Raises","4","12-20"),
-      E("Incline Press","3","8-10"), E("Cable Lateral Raise","3","15-20"),
-      E("Rear Delt Flyes","3","15") ] },
-    { id:uid(), name:"Day 3", focus:"Conditioning", type:"conditioning", note:"Intervals / HIIT / bike · 20-30 min", exercises:[] },
-    { id:uid(), name:"Day 4", focus:"Arms, Forearms & Core", type:"lift", note:"", exercises:[
-      E("EZ-Bar Curl","4","8-10"), E("Hammer Curls","3","12"),
-      E("Close-Grip Bench / Dips","4","8-10"), E("Cable Triceps Pushdown","3","12-15"),
-      E("Wrist Curls","3","15"), E("Cable Woodchops","3","12/side"),
-      E("Hanging Leg Raises","3","12") ] },
-    { id:uid(), name:"Day 5", focus:"Legs & Back (secondary)", type:"lift", note:"", exercises:[
-      E("Squat","3","6-8"), E("Romanian Deadlift","3","8-10"),
-      E("Walking Lunges","3","12/leg"), E("Calf Raises","4","12-15"),
-      E("Lat Pulldown","3","12"), E("Lateral Raises","3","15-20") ] },
-    { id:uid(), name:"Day 6", focus:"Conditioning", type:"conditioning", note:"Incline walk / steady cardio · 30-40 min", exercises:[] },
-    { id:uid(), name:"Day 7", focus:"Rest", type:"rest", note:"Full rest", exercises:[] },
-  ];
-}
+function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", meta:"il.meta" };
-const APP_VERSION = "v22";
+const APP_VERSION = "v23";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -549,6 +526,7 @@ const state = {
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
   viewDate:TODAY, editFood:null, editSet:null,
   expand:{plan:false, quick:false}, fixFood:null, perSet:{}, planEdit:false, planNewFood:null,
+  mealPrefs:{meals:"4", protein:"mixed", treat:"yes"}, mealPrefsOpen:false,
   meta: load(K.meta, {}),
   customFoods: load(K.cf, []),
   customExercises: load(K.ce, []),
@@ -610,8 +588,11 @@ const App = {
     if(!(v>0)){ toast("Enter a goal weight"); return; }
     if(!state.profile) state.profile={ onboarded:true, targets:DEFAULT_TARGETS };
     state.profile.goalWeight=v; save(K.pr,state.profile); applyTargets(); toast("Goal weight set"); render(); },
-  generatePlan(){ state.mealPlan=buildPlan(); state.planEdit=false; state.planNewFood=null; save(K.mp,state.mealPlan); toast("Plan generated"); render(); },
-  buildOwnPlan(){ state.mealPlan={meals:{breakfast:[],lunch:[],dinner:[],snack:[]},tot:{p:0,c:0,f:0,k:0,s:0,sa:0},ts:Date.now()}; state.planEdit=true; state.expand.plan=true; save(K.mp,state.mealPlan); render(); },
+  generatePlan(){ state.mealPlan=buildPlan(state.mealPrefs); state.planEdit=false; state.planNewFood=null; state.mealPrefsOpen=false; state.expand.plan=true; save(K.mp,state.mealPlan); toast("Plan generated"); render(); },
+  openMealPrefs(){ if(!state.mealPrefs) state.mealPrefs={meals:"4",protein:"mixed",treat:"yes"}; state.mealPrefsOpen=true; render(); },
+  closeMealPrefs(){ state.mealPrefsOpen=false; render(); },
+  pickMealPref(k,v){ state.mealPrefs[k]=v; render(); },
+  buildOwnPlan(){ state.mealPlan={meals:{breakfast:[],lunch:[],dinner:[],snack:[]},tot:{p:0,c:0,f:0,k:0,s:0,sa:0},ts:Date.now()}; state.planEdit=true; state.expand.plan=true; state.mealPrefsOpen=false; save(K.mp,state.mealPlan); render(); },
   togglePlanEdit(){ state.planEdit=!state.planEdit; state.planNewFood=null; render(); },
   planRecompute(){ const mp=state.mealPlan; if(!mp) return; const all=[].concat(mp.meals.breakfast||[],mp.meals.lunch||[],mp.meals.dinner||[],mp.meals.snack||[]); const t=sumMac(all); mp.tot={p:t.p,c:t.c,f:t.f,k:t.k,s:t.s,sa:t.sa}; save(K.mp,mp); },
   setPlanAmount(meal,idx,v){ const a=parseFloat(v); const mp=state.mealPlan; if(!mp||!mp.meals[meal]||!mp.meals[meal][idx]) return; if(a>0){ mp.meals[meal][idx].amount=a; App.planRecompute(); render(); } },
@@ -696,6 +677,7 @@ const App = {
   /* ---- PLAN ---- */
   savePlanSoon(){ if(App._pt) clearTimeout(App._pt); App._pt=setTimeout(()=>save(K.p,state.plan),400); },
   editFocus(id,v){ const d=state.plan.find(x=>x.id===id); if(d){ d.focus=v; App.savePlanSoon(); } },
+  editDayName(id,v){ const d=state.plan.find(x=>x.id===id); if(d){ d.name=v; App.markTrain(); App.savePlanSoon(); } },
   editNote(id,v){ const d=state.plan.find(x=>x.id===id); if(d){ d.note=v; App.savePlanSoon(); } },
   editEx(did,eid,field,v){ const d=state.plan.find(x=>x.id===did); if(!d)return; const e=d.exercises.find(x=>x.id===eid); if(e){ e[field]=v; App.markTrain(); App.savePlanSoon(); } },
   addEx(did){ const d=state.plan.find(x=>x.id===did); if(d){ d.exercises.push({id:uid(),name:"",sets:"3",reps:""}); App.markTrain(); save(K.p,state.plan); render(); } },
@@ -704,8 +686,10 @@ const App = {
   moveEx(did,eid,dir){ const d=state.plan.find(x=>x.id===did); if(!d)return; const i=d.exercises.findIndex(e=>e.id===eid), j=i+dir;
     if(i<0||j<0||j>=d.exercises.length)return; const a=d.exercises; const t=a[i]; a[i]=a[j]; a[j]=t; save(K.p,state.plan); render(); },
   setType(did,type){ const d=state.plan.find(x=>x.id===did); if(d){ d.type=type; save(K.p,state.plan); render(); } },
-  resetPlan(){ if(!confirm("Reset the program to the default? This wipes your plan edits (logged sets, food and weight are NOT affected).")) return;
-    state.plan=makeDefaultPlan(); save(K.p,state.plan); state.trainDay=null; state.trainEx=null; toast("Reset to default"); render(); },
+  addDay(){ const n=state.plan.length+1; state.plan.push({ id:uid(), name:"Day "+n, focus:"", type:"lift", note:"", exercises:[] }); App.markTrain(); save(K.p,state.plan); render(); },
+  delDay(id){ if(!confirm("Delete this day? Logged sets are not affected.")) return; state.plan=state.plan.filter(d=>d.id!==id); if(state.trainDay===id) state.trainDay=null; save(K.p,state.plan); render(); },
+  resetPlan(){ if(!confirm("Reset to a blank plan? This clears all training days so you can start fresh. Your logged sets, food and weight are NOT affected.")) return;
+    state.plan=[]; state.trainDay=null; state.trainEx=null; state.meta.trainReady=false; save(K.p,state.plan); save(K.meta,state.meta); toast("Plan cleared"); render(); },
   openProgram(){ state.progData={ level:"intermediate", goal:"hypertrophy", days:"4", equip:"gym", emphasis:[] }; state.progOpen=true; render(); },
   closeProgram(){ state.progOpen=false; render(); },
   pickProg(k,v){ if(state.progData) state.progData[k]=v; render(); },
@@ -875,19 +859,28 @@ function setForP(name,gP,role){ const f=FOOD_BY_NAME[name]; let u=f.p>0?gP*f.q/f
 function setForC(name,gC,role){ const f=FOOD_BY_NAME[name]; let u=f.c>0?gC*f.q/f.c:f.q; return {name,amount:roundAmt(f,clampAmt(f,u,role))}; }
 function setForF(name,gF,role){ const f=FOOD_BY_NAME[name]; let u=f.f>0?gF*f.q/f.f:f.q; return {name,amount:roundAmt(f,clampAmt(f,u,role))}; }
 function planKeep(it){ return it && it.amount>0 && FOOD_BY_NAME[it.name]; }
-function buildPlan(){
+function buildPlan(prefs){
+  prefs = prefs || state.mealPrefs || {meals:"4",protein:"mixed",treat:"yes"};
   const T=TARGETS, P=PLAN_POOLS;
+  const inDB=n=>!!FOOD_BY_NAME[n];
+  const withSnack = prefs.meals!=="3";
+  const fishL=["Salmon","Tuna (can)","Cod"].filter(inDB), fishD=["Salmon","Saba (mackerel)","Cod"].filter(inDB);
+  const chkL=["Chicken breast","Chicken thigh"].filter(inDB), chkD=["Chicken thigh","Chicken breast"].filter(inDB);
+  const vegP=["Firm tofu","Atsuage (fried tofu)","Natto","Edamame (boiled)","Greek yogurt","Egg"].filter(inDB);
+  const lProt=()=>{ if(prefs.protein==="fish"&&fishL.length) return pick(fishL); if(prefs.protein==="chicken"&&chkL.length) return pick(chkL); if(prefs.protein==="veg"&&vegP.length) return pick(vegP); return pick(P.lProtein); };
+  const dProt=()=>{ if(prefs.protein==="fish"&&fishD.length) return pick(fishD); if(prefs.protein==="chicken"&&chkD.length) return pick(chkD); if(prefs.protein==="veg"&&vegP.length) return pick(vegP); return pick(P.dProtein); };
+  const ps = withSnack ? {b:0.25,l:0.30,d:0.30,s:0.15} : {b:0.30,l:0.35,d:0.35,s:0};
   const sel={ bP:pick(P.bProtein), bC:pick(P.bCarb), bFr:pick(P.bFruit), bFat:pick(P.bFat),
-    lP:pick(P.lProtein), lC:pick(P.lCarb), lV:pick(P.veg),
-    dP:pick(P.dProtein), dC:pick(P.dCarb), dV:pick(P.veg),
-    sP:pick(P.sProtein), sX:(Math.random()<0.6?pick(P.treat):pick(P.sHealthy)) };
-  const bPi=setForP(sel.bP,T.p*0.25,"protein"), lPi=setForP(sel.lP,T.p*0.30,"protein"),
-        dPi=setForP(sel.dP,T.p*0.30,"protein"), sPi=setForP(sel.sP,T.p*0.15,"protein");
+    lP:lProt(), lC:pick(P.lCarb), lV:pick(P.veg),
+    dP:dProt(), dC:pick(P.dCarb), dV:pick(P.veg),
+    sP:pick(P.sProtein), sX:(prefs.treat!=="no" && Math.random()<0.6 ? pick(P.treat):pick(P.sHealthy)) };
+  const bPi=setForP(sel.bP,T.p*ps.b,"protein"), lPi=setForP(sel.lP,T.p*ps.l,"protein"),
+        dPi=setForP(sel.dP,T.p*ps.d,"protein"), sPi=withSnack?setForP(sel.sP,T.p*ps.s,"protein"):null;
   const bFri={name:sel.bFr,amount:1};
   const bFati = sel.bFat==="Peanut butter" ? {name:"Peanut butter",amount:1} : {name:sel.bFat,amount:25};
-  const sXi={name:sel.sX,amount:1};
+  const sXi=withSnack?{name:sel.sX,amount:1}:null;
   const lVi={name:sel.lV,amount:120}, dVi={name:sel.dV,amount:120};
-  let base=[bPi,lPi,dPi,sPi,bFri,bFati,sXi,lVi,dVi].filter(planKeep);
+  let base=[bPi,lPi,dPi,sPi,bFri,bFati,sXi,lVi,dVi].filter(Boolean).filter(planKeep);
   let remC=Math.max(0,T.c - sumMac(base).c);
   const bCi=setForC(sel.bC,remC*0.25,"carb"), lCi=setForC(sel.lC,remC*0.40,"carb"), dCi=setForC(sel.dC,remC*0.35,"carb");
   let withCarb=base.concat([bCi,lCi,dCi]);
@@ -895,8 +888,7 @@ function buildPlan(){
   let lOil=null,dOil=null;
   if(remF>4){ lOil=setForF("Olive oil",remF*0.5,"fat"); dOil=setForF("Sesame oil",remF*0.5,"fat"); }
   else if(remF>1){ lOil=setForF("Olive oil",remF,"fat"); }
-  // kcal correction via carb foods
-  let allItems=[bCi,lCi,dCi,bPi,lPi,dPi,sPi,bFri,bFati,sXi,lVi,dVi].concat(lOil?[lOil]:[]).concat(dOil?[dOil]:[]).filter(planKeep);
+  let allItems=[bCi,lCi,dCi,bPi,lPi,dPi,sPi,bFri,bFati,sXi,lVi,dVi].filter(Boolean).concat(lOil?[lOil]:[]).concat(dOil?[dOil]:[]).filter(planKeep);
   const carbItems=[bCi,lCi,dCi].filter(planKeep); const carbK=sumMac(carbItems).k;
   if(carbK>50){ let factor=1+(T.k - sumMac(allItems).k)/carbK; factor=Math.min(1.6,Math.max(0.6,factor));
     carbItems.forEach(ci=>{ const f=FOOD_BY_NAME[ci.name]; ci.amount=roundAmt(f,clampAmt(f,ci.amount*factor,"carb")); }); }
@@ -904,7 +896,7 @@ function buildPlan(){
     breakfast:[bPi,bCi,bFri,bFati].filter(planKeep),
     lunch:[lPi,lCi,lVi].concat(lOil?[lOil]:[]).filter(planKeep),
     dinner:[dPi,dCi,dVi].concat(dOil?[dOil]:[]).filter(planKeep),
-    snack:[sPi,sXi].filter(planKeep)
+    snack:withSnack?[sPi,sXi].filter(Boolean).filter(planKeep):[]
   };
   const tot=sumMac([].concat(meals.breakfast,meals.lunch,meals.dinner,meals.snack));
   return { meals, tot, ts:Date.now() };
@@ -932,6 +924,27 @@ function fixupCard(){
           +'<button class="btn small" data-n="'+esc(it.name)+'" onclick="App.saveMissingFood(this.dataset.n)">Save to My Foods</button></div>';
       }).join("")
     +'</section>';
+}
+function mealPrefsForm(){
+  const d=state.mealPrefs||{meals:"4",protein:"mixed",treat:"yes"};
+  const seg=(k,opts)=>'<div class="seg" style="width:100%;flex-wrap:wrap">'+opts.map(o=>'<button style="flex:1;min-width:58px;'+(d[k]===o[0]?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.pickMealPref(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join("")+'</div>';
+  return '<section class="card stack-sm"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Meal plan options</div>'
+    +'<button class="btn ghost small" style="width:auto;padding:5px 12px;color:var(--text)" onclick="App.closeMealPrefs()">Cancel</button></div>'
+    +'<div><div class="label">Meals / day</div><div style="margin-top:6px">'+seg("meals",[["3","3 meals"],["4","4 (with snack)"]])+'</div></div>'
+    +'<div><div class="label">Protein focus</div><div style="margin-top:6px">'+seg("protein",[["mixed","Mixed"],["fish","Fish"],["chicken","Chicken"],["veg","Veggie"]])+'</div></div>'
+    +'<div><div class="label">Snack treat</div><div style="margin-top:6px">'+seg("treat",[["yes","Sometimes"],["no","Healthy only"]])+'</div></div>'
+    +'<div class="note-muted">Built to hit your targets ('+TARGETS.k+' kcal · '+TARGETS.p+'P). Tweak any amount afterwards.</div>'
+    +'<button class="btn" onclick="App.generatePlan()">Generate meal plan</button></section>';
+}
+function mealPlanPanel(){
+  if(state.mealPrefsOpen) return mealPrefsForm();
+  if(!state.mealPlan){
+    return '<section class="card stack-sm"><div class="label">Meal plan</div>'
+      +'<div class="note-muted">Generate a day of meals that hits your targets, or build your own meal by meal.</div>'
+      +'<div class="row2"><button class="btn small" style="width:100%" onclick="App.openMealPrefs()">Generate</button>'
+      +'<button class="btn small ghost" style="width:100%;color:var(--text)" onclick="App.buildOwnPlan()">Build your own</button></div></section>';
+  }
+  return expander('plan','Meal plan', state.planEdit?'Editing — tap to collapse':'Tap to view, edit & log', mealPlanCard);
 }
 function mealPlanCard(){
   const mp=state.mealPlan;
@@ -1240,6 +1253,11 @@ function trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyE
 
 function programPanel(){
   if(!state.progOpen){
+    const hasProg=state.plan.some(d=>d.type==="lift" && d.exercises.length);
+    if(hasProg){
+      return '<button class="card" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:10px 14px" onclick="App.openProgram()">'
+        +'<span style="font-size:13px;color:var(--muted)">⚙ Auto-generate / replace program</span><span style="color:var(--teal)">›</span></button>';
+    }
     return '<section class="card stack-sm"><div class="label">Auto-generate</div>'
       +'<div class="note-muted">Build a balanced program for your level, goal, days &amp; equipment — then edit anything below.</div>'
       +'<button class="btn" onclick="App.openProgram()">Generate a program</button></section>';
@@ -1285,19 +1303,23 @@ function viewPlan(){
         + '<input value="'+esc(d.note)+'" placeholder="e.g. Sprints 20-30 min" oninput="App.editNote(\''+d.id+'\',this.value)"></div>';
     }
     return '<section class="card stack-sm">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
-      +   '<div class="note-muted">'+esc(d.name)+'</div>'+seg+'</div>'
-      + '<input class="focus-inp" value="'+esc(d.focus)+'" placeholder="Focus" oninput="App.editFocus(\''+d.id+'\',this.value)">'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      +   '<input class="focus-inp" style="font-weight:700;flex:1" value="'+esc(d.name)+'" placeholder="Day name" oninput="App.editDayName(\''+d.id+'\',this.value)">'
+      +   '<button class="x" onclick="App.delDay(\''+d.id+'\')" title="Delete day">×</button></div>'
+      + '<div>'+seg+'</div>'
+      + '<input class="focus-inp" value="'+esc(d.focus)+'" placeholder="Focus (e.g. Back & rear delts)" oninput="App.editFocus(\''+d.id+'\',this.value)">'
       + body + '</section>';
   }).join("");
   const lifts=state.plan.filter(d=>d.type==="lift").length;
   return '<div class="stack-sm">'
     + '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Training plan</div>'
-    +   '<div class="mono" style="font-size:11px;color:var(--muted)">'+lifts+' lifting days</div></div>'
+    +   '<div class="mono" style="font-size:11px;color:var(--muted)">'+lifts+' lifting day'+(lifts===1?'':'s')+'</div></div>'
     + programPanel()
     + cards
+    + (state.plan.length?'':'<div class="note-muted" style="text-align:center;padding:10px 4px">No training days yet. Generate a program above, or add a day to build your own.</div>')
+    + '<button class="btn ghost" onclick="App.addDay()">+ Add training day</button>'
     + exLibDatalist()
-    + '<button class="btn ghost" style="margin-top:4px" onclick="App.resetPlan()">↺ Reset to default program</button>'
+    + (state.plan.length?'<button class="btn ghost" style="margin-top:2px;color:var(--muted)" onclick="App.resetPlan()">↺ Clear all days</button>':'')
     + '</div>';
 }
 
@@ -1349,6 +1371,7 @@ function viewEat(){
   return '<div class="stack">'
     + banner("Nutrition","栄養ゲージ")
     + '<section class="stack-sm">'+dateStepper()+'<div class="label">Logging to</div><div class="chips">'+mealChips+'</div></section>'
+    + mealPlanPanel()
     + '<section class="card stack-sm">'
     +   '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">'+(state.viewDate===TODAY?"Today":esc(prettyDate(state.viewDate)))+' vs target</div>'
     +     '<div class="mono" style="font-size:12px;color:var(--muted)">'+today.length+' items</div></div>'
@@ -1361,7 +1384,6 @@ function viewEat(){
     + '</section>'
     + fixupCard()
     + eatFoodCard(fo, selectedIsCustom)
-    + expander('plan','Meal plan', state.mealPlan?'Tap to view & log your saved plan':'Tap to generate a plan from your targets', mealPlanCard)
     + expander('quick','Quick add from text', 'Type a meal in plain words to log it fast', quickAddCard)
     + '<section><div style="display:flex;align-items:center;justify-content:space-between"><div class="label">Eaten '+esc(dayWord)+'</div>'
     +   '<button class="chip" onclick="App.copyYesterday()">⧉ Copy '+(state.viewDate===TODAY?"yesterday":"prev day")+'</button></div>'
