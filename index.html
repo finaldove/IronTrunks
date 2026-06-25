@@ -1394,7 +1394,6 @@ function viewEat(){
   if(!state.eatFood) state.eatFood=FOODS[0].n;
   const fo=resolveFood(state.eatFood);
   const selectedIsCustom = !!(fo && fo.custom);
-  const mealChips=MEALS.map(m=>'<button class="chip'+(m===state.eatMeal?' on':'')+'" onclick="App.setMeal(\''+m+'\')">'+m+'</button>').join("");
 
   const groups=MEALS.concat(["Other"]).map(m=>({m,items:today.filter(e=>(MEALS.indexOf(e.meal)>=0?e.meal:"Other")===m)})).filter(g=>g.items.length);
   let list = groups.length===0 ? emptyBox("Nothing logged yet. Pick a meal and add a food.")
@@ -1415,7 +1414,7 @@ function viewEat(){
 
   return '<div class="stack">'
     + banner("Nutrition","栄養ゲージ")
-    + '<section class="stack-sm">'+dateStepper()+'<div class="label">Logging to</div><div class="chips">'+mealChips+'</div></section>'
+    + '<section>'+dateStepper()+'</section>'
     + mealPlanPanel()
     + '<section class="card stack-sm">'
     +   '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">'+(state.viewDate===TODAY?"Today":esc(prettyDate(state.viewDate)))+' vs target</div>'
@@ -1436,6 +1435,8 @@ function viewEat(){
     + '</div>';
 }
 function eatFoodCard(fo, selectedIsCustom){
+  const mealChips=MEALS.map(m=>'<button class="chip'+(m===state.eatMeal?' on':'')+'" onclick="App.setMeal(\''+m+'\')">'+m+'</button>').join("");
+  const mealRow='<div><div class="label">Add to meal</div><div class="chips" style="margin-top:6px">'+mealChips+'</div></div>';
   const seg='<div style="display:flex;align-items:center;justify-content:space-between">'
     +'<div class="label">Add food</div><div class="seg">'
     +'<button onclick="App.setEatMode(\'list\')" style="'+(state.eatMode!=="custom"?"background:var(--teal);color:var(--ink)":"")+'">List</button>'
@@ -1467,7 +1468,7 @@ function eatFoodCard(fo, selectedIsCustom){
       body=head+'<div style="font-size:13px;color:var(--muted);margin-top:4px">“'+esc(state.eatFood)+'” isn’t in the list. Tap <b>Custom</b> above to add it with its macros — it’ll then turn up in search.</div>';
     }
   }
-  return '<section class="card stack-sm">'+seg+body+'</section>';
+  return '<section class="card stack-sm">'+mealRow+seg+body+'</section>';
 }
 function miniLimit(label,eaten,target){ const over=eaten>target;
   return '<div style="background:var(--panel2);border:1px solid '+(over?'var(--red)':'var(--line)')+';border-radius:12px;padding:8px 12px;display:flex;align-items:baseline;justify-content:space-between">'
