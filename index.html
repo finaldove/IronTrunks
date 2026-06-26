@@ -558,6 +558,7 @@ const state = {
   mealPrefs:{meals:"4", protein:"mixed", treat:"yes"}, mealPrefsOpen:false,
   meta: load(K.meta, {}),
   customFoods: load(K.cf, []),
+  editCustomFoodId: null,
   customExercises: load(K.ce, []),
   profile: load(K.pr, null),
   mealPlan: load(K.mp, null),
@@ -820,6 +821,28 @@ const App = {
   },
   delCustomFood(id){ state.customFoods=state.customFoods.filter(x=>x.id!==id); save(K.cf,state.customFoods);
     if(!resolveFood(state.eatFood)) state.eatFood=FOODS[0].n; render(); },
+  editCustomFoodStart(id){ state.editCustomFoodId=id; render(); },
+  editCustomFoodCancel(){ state.editCustomFoodId=null; render(); },
+  editCustomFoodSave(id){
+    const cf=state.customFoods.find(x=>x.id===id); if(!cf) return;
+    const name=(document.getElementById("ecf_name_"+id).value||"").trim();
+    const k=parseFloat(document.getElementById("ecf_k_"+id).value)||0;
+    const p=parseFloat(document.getElementById("ecf_p_"+id).value)||0;
+    const c=parseFloat(document.getElementById("ecf_c_"+id).value)||0;
+    const f=parseFloat(document.getElementById("ecf_f_"+id).value)||0;
+    const s=parseFloat(document.getElementById("ecf_s_"+id).value)||0;
+    const sat=parseFloat(document.getElementById("ecf_sat_"+id).value)||0;
+    if(!name){ toast("Name can't be empty"); return; }
+    Object.assign(cf,{n:name,k:k,p:p,c:c,f:f,s:s,sa:sat});
+    save(K.cf,state.customFoods); state.editCustomFoodId=null;
+    if(!resolveFood(state.eatFood)) state.eatFood=FOODS[0].n;
+    toast("Updated \""+name+"\""); render();
+  },
+  deleteCustomFoodConfirm(id){
+    const cf=state.customFoods.find(x=>x.id===id); if(!cf) return;
+    if(!confirm('Delete "'+cf.n+'" from My Foods? Already-logged entries keep their own numbers and won\'t be affected.')) return;
+    App.delCustomFood(id);
+  },
 
   /* ---- DATE / RECENTS / EDIT / GUIDE ---- */
   stepDate(delta){ const ns=shiftDate(state.viewDate,delta); if(dayDiff(ns,TODAY)>0) return; state.viewDate=ns; state.editFood=null; state.editSet=null; render(); },
@@ -1118,6 +1141,32 @@ function expander(key, title, subtitle, contentFn){
       +'<span style="font-size:16px;color:var(--teal);padding-left:8px">'+(open?'▾':'▸')+'</span></button>'
     +(open?'<div style="margin-top:8px">'+contentFn()+'</div>':'')
     +'</div>';
+}
+function myFoodsCard(){
+  const list=state.customFoods;
+  if(!list.length) return '<div class="note-muted">No custom foods saved yet. They\'ll appear here once you save one from Eat → Custom, or from a "Foods to add" prompt.</div>';
+  return '<div class="stack-sm">'+list.map(cf=>{
+    const editing=state.editCustomFoodId===cf.id;
+    if(editing){
+      return '<div class="item" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px">'
+        +'<div class="field"><input id="ecf_name_'+cf.id+'" value="'+esc(cf.n)+'" placeholder="Name"></div>'
+        +'<div class="row2"><div><div class="label">Calories</div><div class="field" style="margin-top:4px"><input id="ecf_k_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.k)+'"></div></div>'
+        +'<div><div class="label">Protein g</div><div class="field" style="margin-top:4px"><input id="ecf_p_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.p)+'"></div></div></div>'
+        +'<div class="row2"><div><div class="label">Carbs g</div><div class="field" style="margin-top:4px"><input id="ecf_c_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.c)+'"></div></div>'
+        +'<div><div class="label">Fat g</div><div class="field" style="margin-top:4px"><input id="ecf_f_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.f)+'"></div></div></div>'
+        +'<div class="row2"><div><div class="label">Sugar g</div><div class="field" style="margin-top:4px"><input id="ecf_s_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.s||0)+'"></div></div>'
+        +'<div><div class="label">Sat fat g</div><div class="field" style="margin-top:4px"><input id="ecf_sat_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.sa||0)+'"></div></div></div>'
+        +'<div class="note-muted" style="font-size:11px">Updates apply to future logging only — entries you\'ve already logged keep the numbers they were logged with.</div>'
+        +'<div class="row2"><button class="btn small" onclick="App.editCustomFoodSave(\''+cf.id+'\')">Save</button>'
+        +'<button class="btn small ghost" style="color:var(--text)" onclick="App.editCustomFoodCancel()">Cancel</button></div>'
+        +'</div>';
+    }
+    return '<div class="item" style="padding:9px 10px">'
+      +'<div class="min0"><div class="truncate" style="font-weight:600">'+esc(cf.n)+'</div>'
+      +'<div class="note-muted" style="font-size:11px">'+Math.round(cf.k)+' kcal · '+r1(cf.p)+'P · '+r1(cf.c)+'C · '+r1(cf.f)+'F</div></div>'
+      +'<div style="display:flex;gap:4px;flex-shrink:0"><button class="chip" onclick="App.editCustomFoodStart(\''+cf.id+'\')">Edit</button>'
+      +'<button class="x" onclick="App.deleteCustomFoodConfirm(\''+cf.id+'\')">×</button></div></div>';
+  }).join("")+'</div>';
 }
 function emptyBox(t){ return '<div class="empty">'+esc(t)+'</div>'; }
 function dateStepper(){
@@ -1534,7 +1583,7 @@ function eatFoodCard(fo, selectedIsCustom){
     if(fo){
       body=head
         +'<div><div class="label">Amount · '+esc(fo.u)+'</div><div class="field" style="margin-top:6px"><input id="amt" class="inp-num" inputmode="decimal" placeholder="'+(fo.u==="g"?"200":"1")+'"></div></div>'
-        +(selectedIsCustom?'<button onclick="App.delCustomFood(\''+fo.id+'\')" style="background:none;color:var(--muted);font-size:12px;text-decoration:underline;text-align:left">Remove “'+esc(fo.n)+'” from My Foods</button>':'')
+        +(selectedIsCustom?'<button onclick="App.deleteCustomFoodConfirm(\''+fo.id+'\')" style="background:none;color:var(--muted);font-size:12px;text-decoration:underline;text-align:left">Remove “'+esc(fo.n)+'” from My Foods</button>':'')
         +'<button class="btn" onclick="App.addFood()">+ Add to '+state.eatMeal+'</button>';
     } else {
       body=head+'<div style="font-size:13px;color:var(--muted);margin-top:4px">“'+esc(state.eatFood)+'” isn’t in the list. Tap <b>Custom</b> above to add it with its macros — it’ll then turn up in search.</div>';
@@ -1689,6 +1738,8 @@ function viewStats(){
     + '<section class="card stack-sm"><div class="label">Settings</div>'
     +   '<div class="note-muted">Targets · '+TARGETS.k+' kcal · '+TARGETS.p+'P / '+TARGETS.c+'C / '+TARGETS.f+'F</div>'
     +   '<button class="btn ghost small" style="color:var(--text)" onclick="App.openSetup()">'+(state.profile?'Recalculate targets':'Set up targets')+'</button>'
+    +   '<div style="height:1px;background:var(--line);margin:6px 0"></div>'
+    +   expander('myfoods', 'My Foods ('+state.customFoods.length+')', 'Edit or remove your saved custom foods', myFoodsCard)
     +   '<div style="height:1px;background:var(--line);margin:6px 0"></div>'
     +   '<div class="note-muted">Backup — save a copy of all your data, or restore one. Do this before any app update.</div>'
     +   '<div class="row2"><button class="btn small" style="width:100%" onclick="App.exportData()">Export</button>'
