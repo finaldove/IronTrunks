@@ -1546,8 +1546,8 @@ function viewEat(){
     + '</section>'
     + fixupCard()
     + eatFoodCard(fo, selectedIsCustom)
-    + expander('myfoods', 'My Foods ('+state.customFoods.length+')', 'Edit or remove your saved custom foods', myFoodsCard)
     + expander('quick','Quick add from text', 'Type a meal in plain words to log it fast', quickAddCard)
+    + expander('myfoods', 'My Foods ('+state.customFoods.length+')', 'Edit or remove your saved custom foods', myFoodsCard)
     + '<section><div style="display:flex;align-items:center;justify-content:space-between"><div class="label">Eaten '+esc(dayWord)+'</div>'
     +   '<button class="chip" onclick="App.copyYesterday()">⧉ Copy '+(state.viewDate===TODAY?"yesterday":"prev day")+'</button></div>'
     +   '<div style="margin-top:8px">'+list+'</div></section>'
