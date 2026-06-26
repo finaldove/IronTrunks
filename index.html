@@ -806,13 +806,15 @@ const App = {
     const c=parseFloat(document.getElementById("cC").value)||0;
     const f=parseFloat(document.getElementById("cF").value)||0;
     const kIn=parseFloat(document.getElementById("cK").value)||0;
+    const s=parseFloat(document.getElementById("cS").value)||0;
+    const sat=parseFloat(document.getElementById("cSat").value)||0;
     const saveIt=document.getElementById("cSave").checked;
     if(!name || (kIn<=0 && p<=0 && c<=0 && f<=0)){ toast("Add a name and at least one value"); return; }
     const k = kIn>0 ? kIn : Math.round((4*p)+(4*c)+(9*f));
-    state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:name, amount:1, unit:"serving", p:p, c:c, f:f, s:0, sa:0, k:k });
+    state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:name, amount:1, unit:"serving", p:p, c:c, f:f, s:s, sa:sat, k:k });
     save(K.f,state.flog);
     if(saveIt && !state.customFoods.some(x=>x.n.toLowerCase()===name.toLowerCase())){
-      state.customFoods.push({ id:uid(), n:name, p:p, c:c, f:f, s:0, sa:0, k:k }); save(K.cf,state.customFoods);
+      state.customFoods.push({ id:uid(), n:name, p:p, c:c, f:f, s:s, sa:sat, k:k }); save(K.cf,state.customFoods);
     }
     toast(saveIt?"Logged & saved":"Added to "+state.eatMeal); render();
   },
@@ -1511,13 +1513,16 @@ function eatFoodCard(fo, selectedIsCustom){
     +'</div></div>';
   let body;
   if(state.eatMode==="custom"){
-    body='<div><div class="label">Name</div><div class="field" style="margin-top:6px"><input id="cName" placeholder="e.g. Work dinner — yakiniku"></div></div>'
+    body='<div class="note-muted">Log a one-off estimate — a restaurant meal, a whole day\'s guess, anything not in your food list. Counts toward today\'s totals only; it\'s <b>not</b> saved as a reusable food unless you tick the box below.</div>'
+      +'<div><div class="label">Name</div><div class="field" style="margin-top:6px"><input id="cName" placeholder="e.g. Kebab dinner — estimate"></div></div>'
       +'<div class="row2"><div><div class="label">Calories</div><div class="field" style="margin-top:6px"><input id="cK" class="inp-num" inputmode="decimal" placeholder="600"></div></div>'
       +'<div><div class="label">Protein g</div><div class="field" style="margin-top:6px"><input id="cP" class="inp-num" inputmode="decimal" placeholder="40"></div></div></div>'
       +'<div class="row2"><div><div class="label">Carbs g</div><div class="field" style="margin-top:6px"><input id="cC" class="inp-num" inputmode="decimal" placeholder="50"></div></div>'
       +'<div><div class="label">Fat g</div><div class="field" style="margin-top:6px"><input id="cF" class="inp-num" inputmode="decimal" placeholder="20"></div></div></div>'
-      +'<div style="font-size:11px;color:var(--muted)">Leave calories blank to auto-calc from the macros.</div>'
-      +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)"><input type="checkbox" id="cSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Save to My Foods for next time</label>'
+      +'<div class="row2"><div><div class="label">Sugar g <span style="color:var(--muted);font-weight:400">(optional)</span></div><div class="field" style="margin-top:6px"><input id="cS" class="inp-num" inputmode="decimal" placeholder="0"></div></div>'
+      +'<div><div class="label">Sat fat g <span style="color:var(--muted);font-weight:400">(optional)</span></div><div class="field" style="margin-top:6px"><input id="cSat" class="inp-num" inputmode="decimal" placeholder="0"></div></div></div>'
+      +'<div style="font-size:11px;color:var(--muted)">Leave calories blank to auto-calc from P/C/F.</div>'
+      +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)"><input type="checkbox" id="cSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Also save to My Foods for next time</label>'
       +'<button class="btn" onclick="App.addCustom()">+ Add to '+state.eatMeal+'</button>';
   } else {
     const rec=recentFoods();
