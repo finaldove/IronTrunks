@@ -1546,6 +1546,7 @@ function viewEat(){
     + '</section>'
     + fixupCard()
     + eatFoodCard(fo, selectedIsCustom)
+    + expander('myfoods', 'My Foods ('+state.customFoods.length+')', 'Edit or remove your saved custom foods', myFoodsCard)
     + expander('quick','Quick add from text', 'Type a meal in plain words to log it fast', quickAddCard)
     + '<section><div style="display:flex;align-items:center;justify-content:space-between"><div class="label">Eaten '+esc(dayWord)+'</div>'
     +   '<button class="chip" onclick="App.copyYesterday()">⧉ Copy '+(state.viewDate===TODAY?"yesterday":"prev day")+'</button></div>'
@@ -1738,8 +1739,6 @@ function viewStats(){
     + '<section class="card stack-sm"><div class="label">Settings</div>'
     +   '<div class="note-muted">Targets · '+TARGETS.k+' kcal · '+TARGETS.p+'P / '+TARGETS.c+'C / '+TARGETS.f+'F</div>'
     +   '<button class="btn ghost small" style="color:var(--text)" onclick="App.openSetup()">'+(state.profile?'Recalculate targets':'Set up targets')+'</button>'
-    +   '<div style="height:1px;background:var(--line);margin:6px 0"></div>'
-    +   expander('myfoods', 'My Foods ('+state.customFoods.length+')', 'Edit or remove your saved custom foods', myFoodsCard)
     +   '<div style="height:1px;background:var(--line);margin:6px 0"></div>'
     +   '<div class="note-muted">Backup — save a copy of all your data, or restore one. Do this before any app update.</div>'
     +   '<div class="row2"><button class="btn small" style="width:100%" onclick="App.exportData()">Export</button>'
