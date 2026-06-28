@@ -73,6 +73,7 @@
   .field input, .field select{ background:transparent; color:var(--text); border:none; outline:none; width:100%; font-size:15px; }
   .inp-num{ font-family:var(--mono); font-size:18px; font-weight:700; color:var(--text); }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
   .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:11px; }
 
   .chips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
@@ -94,7 +95,6 @@
   .btn.ghost::after{ display:none; }
   .btn.tealtext{ background:transparent; color:var(--gold); border:1px dashed var(--line); font-size:13px; padding:10px; box-shadow:none; }
   .btn.tealtext::after{ display:none; }
-  .btn.danger{ background:linear-gradient(180deg,#ff3144,var(--crimson) 40%,#a81223); }
   .btn.small{ padding:12px; font-size:14px; }
 
   .item{ background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--crimson); padding:9px 13px;
@@ -179,7 +179,7 @@
 
 <script>
 /* ============================== DATA ============================== */
-const DEFAULT_TARGETS = { p:190, c:250, f:70, s:60, sa:27, k:2400 };
+const DEFAULT_TARGETS = { p:190, c:250, f:70, s:60, sa:27, k:2400, na:2300 };
 let TARGETS = DEFAULT_TARGETS;
 const MEALS = ["Breakfast","Lunch","Dinner","Snack"];
 const FOOD_GROUPS = ["Protein","Carb","Veg & Fruit","Fat & Nuts","Dairy","Konbini & Prepared","Snacks & Sweets","Drinks","Sauce"];
@@ -292,9 +292,42 @@ const FOODS = [
   ["Silky Tofu","Protein","g",100,5.3,2.0,3.5,0.9,0.5,56],
   ["Soy protein isolate","Protein","g",100,88,3,1.5,1,0.3,375],
   ["Soy yogurt (homemade)","Dairy","g",100,3.6,3.4,2.2,2.5,0.3,48],
-].map(a => ({ n:a[0], g:a[1], u:a[2], q:a[3], p:a[4], c:a[5], f:a[6], s:a[7], sa:a[8], k:a[9] }));
+].map(a => ({ n:a[0], g:a[1], u:a[2], q:a[3], p:a[4], c:a[5], f:a[6], s:a[7], sa:a[8], k:a[9], na:0 }));
+/* Sodium (mg) per the food's base serving. Japanese labels list 食塩相当量 (salt g);
+   sodium mg = salt g x 393. Whole foods (fresh meat, veg, fruit, plain rice, oils, nuts)
+   are naturally near-zero and left at 0; values below cover processed/salted items where
+   sodium actually matters. Figures are typical label/八訂 values, rounded. */
+const SODIUM = {
+  // Sauces & seasonings (the big hitters)
+  "Soy sauce":914,"Miso":1300,"Ponzu":640,"Mentsuyu (diluted)":540,"Tonkatsu sauce":230,
+  "Okonomiyaki sauce":230,"Oyster sauce":640,"Yakiniku sauce":350,"Ketchup":130,"Mayonnaise":80,
+  "Sriracha":140,"Dashi (stock)":80,"Sesame dressing":190,"Mentaiko":1400,
+  // Canned / salted / processed proteins
+  "Tuna (can)":210,"Sardines (can)":160,"Mackerel (can)":140,"Shirasu (whitebait)":600,
+  "Ikura (salmon roe)":910,"Chikuwa":600,"Kamaboko":380,"Satsuma-age":300,"Hanpen":350,
+  "Salad chicken (konbini)":420,"Aburaage":2,"Atsuage (fried tofu)":2,"Natto":2,"Protein bar":90,
+  "SAVAS milk protein":110,
+  // Dairy
+  "Cheese slice":420,"Cream cheese":250,"Pizza cheese (shredded)":280,"Milk":40,"Low-fat milk":50,
+  // Carbs / bread / noodles
+  "Bread":230,"Udon (boiled)":120,"Somen (boiled)":80,"Soba (boiled)":60,"Ramen noodles (fresh, boiled)":110,"Mochi":1,
+  // Veg with salt (seaweed/pickled)
+  "Nori (seaweed)":50,"Wakame (rehydrated)":120,"Hijiki (cooked)":140,
+  // Konbini & prepared (per piece/serving)
+  "Onigiri (salmon)":480,"Onigiri (tuna mayo)":470,"Onigiri (umeboshi)":580,"Onigiri (plain/salt)":420,
+  "Tamagoyaki":180,"Korokke (potato)":300,"Karaage (fried chicken)":420,"Chicken katsu":380,
+  "Yakitori (1 skewer)":300,"Oden egg":250,"Oden daikon":300,"Miso soup (1 bowl)":1200,
+  "Instant ramen (1 pack)":2300,"Cup noodle":1900,"Konbini salad (chicken)":520,"Egg sando (konbini)":560,
+  // Snacks
+  "Senbei (rice cracker)":120,"Pocky (~half pack)":40,"Anpan":140,"Melonpan":160,"Calorie Mate (2 bars)":160,"SOYJOY (1 bar)":40,
+  // Drinks
+  "Pocari Sweat":98,"Beer (350ml)":12,"Cola":4,
+  // Butter
+  "Butter":75
+};
 const FOOD_BY_NAME = Object.fromEntries(FOODS.map(x => [x.n, x]));
-function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:cf.u||"serving", q:cf.q||1, p:cf.p, c:cf.c, f:cf.f, s:cf.s||0, sa:cf.sa||0, k:cf.k, custom:true, id:cf.id }; }
+Object.keys(SODIUM).forEach(function(n){ if(FOOD_BY_NAME[n]) FOOD_BY_NAME[n].na=SODIUM[n]; });
+function customAsFood(cf){ return { n:cf.n, g:"My Foods", u:cf.u||"serving", q:cf.q||1, p:cf.p, c:cf.c, f:cf.f, s:cf.s||0, sa:cf.sa||0, k:cf.k, na:cf.na||0, custom:true, id:cf.id }; }
 function resolveFood(name){
   if(FOOD_BY_NAME[name]) return FOOD_BY_NAME[name];
   for(var i=0;i<state.customFoods.length;i++){ if(state.customFoods[i].n===name) return customAsFood(state.customFoods[i]); }
@@ -527,7 +560,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v24";
+const APP_VERSION = "v25";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -588,7 +621,7 @@ function computeTargets(d){
   const p = Math.round(w*ppk);
   const f = Math.round(cals*0.25/9);
   let c = Math.round((cals - p*4 - f*9)/4); if(c<0) c=0;
-  return { p, c, f, s:Math.round(cals*0.10/4), sa:Math.round(cals*0.10/9), k:cals };
+  return { p, c, f, s:Math.round(cals*0.10/4), sa:Math.round(cals*0.10/9), k:cals, na:2300 };
 }
 
 let toastTimer=null;
@@ -694,7 +727,6 @@ const App = {
   liftDays(){ return state.plan.filter(d=>d.type==="lift"); },
   currentDay(){ const ld=App.liftDays(); return ld.find(d=>d.id===state.trainDay) || ld[0]; },
   setTrainDay(id){ state.trainDay=id; const d=App.currentDay(); const names=d?d.exercises.map(e=>e.name).filter(Boolean):[]; state.trainEx=names[0]||null; render(); },
-  setTrainEx(name){ state.trainEx=name; render(); },
   logSet(){
     const d=App.currentDay(); if(!d) return;
     const w=parseFloat(document.getElementById("tw").value);
@@ -772,7 +804,6 @@ const App = {
 
   /* ---- EAT ---- */
   setMeal(m){ state.eatMeal=m; render(); },
-  setFood(n){ state.eatFood=n; render(); },
   pickFood(v){ state.eatFood=(v||"").trim(); render(); },
   pickEx(v){ state.trainEx=(v||"").trim(); render(); },
   addFood(){ const fo=resolveFood(state.eatFood);
@@ -781,7 +812,7 @@ const App = {
     if(!(a>0)){ toast("Enter an amount"); return; }
     const fac=a/fo.q;
     state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:fo.n, amount:a, unit:fo.u,
-      p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac });
+      p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac, na:(fo.na||0)*fac });
     save(K.f,state.flog); toast("Added to "+state.eatMeal); render();
   },
   delFood(id){ state.flog=state.flog.filter(x=>x.id!==id); save(K.f,state.flog); render(); },
@@ -798,7 +829,7 @@ const App = {
     if(!items.length){ toast("Nothing to log"); return; }
     items.forEach(it=>{ const fo=resolveFood(it.foodName); if(!fo) return; const fac=it.amount/fo.q;
       state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:fo.n, amount:it.amount, unit:fo.u,
-        p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac }); });
+        p:fo.p*fac, c:fo.c*fac, f:fo.f*fac, s:fo.s*fac, sa:fo.sa*fac, k:fo.k*fac, na:(fo.na||0)*fac }); });
     save(K.f,state.flog); state.parsed=[]; state.parseInput="";
     toast("Logged "+items.length+" item"+(items.length>1?"s":"")+" to "+state.eatMeal); render(); },
   addCustom(){
@@ -809,13 +840,14 @@ const App = {
     const kIn=parseFloat(document.getElementById("cK").value)||0;
     const s=parseFloat(document.getElementById("cS").value)||0;
     const sat=parseFloat(document.getElementById("cSat").value)||0;
+    const na=parseFloat(document.getElementById("cNa").value)||0;
     const saveIt=document.getElementById("cSave").checked;
     if(!name || (kIn<=0 && p<=0 && c<=0 && f<=0)){ toast("Add a name and at least one value"); return; }
     const k = kIn>0 ? kIn : Math.round((4*p)+(4*c)+(9*f));
-    state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:name, amount:1, unit:"serving", p:p, c:c, f:f, s:s, sa:sat, k:k });
+    state.flog.push({ id:uid(), date:state.viewDate, meal:state.eatMeal, name:name, amount:1, unit:"serving", p:p, c:c, f:f, s:s, sa:sat, k:k, na:na });
     save(K.f,state.flog);
     if(saveIt && !state.customFoods.some(x=>x.n.toLowerCase()===name.toLowerCase())){
-      state.customFoods.push({ id:uid(), n:name, p:p, c:c, f:f, s:s, sa:sat, k:k }); save(K.cf,state.customFoods);
+      state.customFoods.push({ id:uid(), n:name, p:p, c:c, f:f, s:s, sa:sat, k:k, na:na }); save(K.cf,state.customFoods);
     }
     toast(saveIt?"Logged & saved":"Added to "+state.eatMeal); render();
   },
@@ -832,8 +864,9 @@ const App = {
     const f=parseFloat(document.getElementById("ecf_f_"+id).value)||0;
     const s=parseFloat(document.getElementById("ecf_s_"+id).value)||0;
     const sat=parseFloat(document.getElementById("ecf_sat_"+id).value)||0;
+    const na=parseFloat(document.getElementById("ecf_na_"+id).value)||0;
     if(!name){ toast("Name can't be empty"); return; }
-    Object.assign(cf,{n:name,k:k,p:p,c:c,f:f,s:s,sa:sat});
+    Object.assign(cf,{n:name,k:k,p:p,c:c,f:f,s:s,sa:sat,na:na});
     save(K.cf,state.customFoods); state.editCustomFoodId=null;
     if(!resolveFood(state.eatFood)) state.eatFood=FOODS[0].n;
     toast("Updated \""+name+"\""); render();
@@ -859,8 +892,8 @@ const App = {
     const a=parseFloat(document.getElementById("ef_"+id).value);
     if(!(a>0)){ toast("Enter an amount"); return; }
     const fo=resolveFood(e.name);
-    if(fo){ const fac=a/fo.q; Object.assign(e,{amount:a,unit:fo.u,p:fo.p*fac,c:fo.c*fac,f:fo.f*fac,s:fo.s*fac,sa:fo.sa*fac,k:fo.k*fac}); }
-    else { const r=a/(e.amount||1); Object.assign(e,{amount:a,p:e.p*r,c:e.c*r,f:e.f*r,s:e.s*r,sa:e.sa*r,k:e.k*r}); }
+    if(fo){ const fac=a/fo.q; Object.assign(e,{amount:a,unit:fo.u,p:fo.p*fac,c:fo.c*fac,f:fo.f*fac,s:fo.s*fac,sa:fo.sa*fac,k:fo.k*fac,na:(fo.na||0)*fac}); }
+    else { const r=a/(e.amount||1); Object.assign(e,{amount:a,p:e.p*r,c:e.c*r,f:e.f*r,s:e.s*r,sa:e.sa*r,k:e.k*r,na:(e.na||0)*r}); }
     save(K.f,state.flog); state.editFood=null; toast("Updated"); render(); },
   editSetStart(id){ state.editSet=id; state.editFood=null; render(); },
   editSetSave(id){ const s=state.wlog.find(x=>x.id===id); if(!s) return;
@@ -887,7 +920,7 @@ const App = {
 
   /* ---- DATA ---- */
   exportData(){
-    const payload={ app:"IronTrunks", version:4, exportedAt:new Date().toISOString(),
+    const payload={ app:"IronTrunks", version:5, exportedAt:new Date().toISOString(),
       workoutLog:state.wlog, foodLog:state.flog, weightLog:state.blog, trainingPlan:state.plan,
       customFoods:state.customFoods, customExercises:state.customExercises, profile:state.profile, mealPlan:state.mealPlan, mealPlans:state.mealPlans };
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
@@ -942,8 +975,8 @@ const PLAN_POOLS = {
 };
 function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
 function isCountUnit(u){ return !(u==="g"||u==="ml"); }
-function pMac(name,amount){ const f=resolveFood(name); if(!f) return {p:0,c:0,f:0,k:0,s:0,sa:0}; const x=amount/f.q; return {p:f.p*x,c:f.c*x,f:f.f*x,k:f.k*x,s:f.s*x,sa:f.sa*x}; }
-function sumMac(items){ return items.reduce((a,it)=>{const m=pMac(it.name,it.amount);return {p:a.p+m.p,c:a.c+m.c,f:a.f+m.f,k:a.k+m.k,s:a.s+m.s,sa:a.sa+m.sa};},{p:0,c:0,f:0,k:0,s:0,sa:0}); }
+function pMac(name,amount){ const f=resolveFood(name); if(!f) return {p:0,c:0,f:0,k:0,s:0,sa:0,na:0}; const x=amount/f.q; return {p:f.p*x,c:f.c*x,f:f.f*x,k:f.k*x,s:f.s*x,sa:f.sa*x,na:(f.na||0)*x}; }
+function sumMac(items){ return items.reduce((a,it)=>{const m=pMac(it.name,it.amount);return {p:a.p+m.p,c:a.c+m.c,f:a.f+m.f,k:a.k+m.k,s:a.s+m.s,sa:a.sa+m.sa,na:a.na+m.na};},{p:0,c:0,f:0,k:0,s:0,sa:0,na:0}); }
 function clampAmt(f,u,role){
   if(isCountUnit(f.u)){ const m = f.u==="scoop"?3:((f.u==="tbsp"||f.u==="tsp")?3:4); return Math.min(m,Math.max(1,u)); }
   let lo=20,hi=300; if(role==="fat"){lo=0;hi=40;} if(role==="veg"){lo=80;hi=200;}
@@ -1156,6 +1189,7 @@ function myFoodsCard(){
         +'<div><div class="label">Fat g</div><div class="field" style="margin-top:4px"><input id="ecf_f_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.f)+'"></div></div></div>'
         +'<div class="row2"><div><div class="label">Sugar g</div><div class="field" style="margin-top:4px"><input id="ecf_s_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.s||0)+'"></div></div>'
         +'<div><div class="label">Sat fat g</div><div class="field" style="margin-top:4px"><input id="ecf_sat_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.sa||0)+'"></div></div></div>'
+        +'<div><div class="label">Sodium mg</div><div class="field" style="margin-top:4px"><input id="ecf_na_'+cf.id+'" class="inp-num" inputmode="decimal" value="'+r1(cf.na||0)+'"></div></div>'
         +'<div class="note-muted" style="font-size:11px">Updates apply to future logging only — entries you\'ve already logged keep the numbers they were logged with.</div>'
         +'<div class="row2"><button class="btn small" onclick="App.editCustomFoodSave(\''+cf.id+'\')">Save</button>'
         +'<button class="btn small ghost" style="color:var(--text)" onclick="App.editCustomFoodCancel()">Cancel</button></div>'
@@ -1163,7 +1197,7 @@ function myFoodsCard(){
     }
     return '<div class="item" style="padding:9px 10px">'
       +'<div class="min0"><div class="truncate" style="font-weight:600">'+esc(cf.n)+'</div>'
-      +'<div class="note-muted" style="font-size:11px">'+Math.round(cf.k)+' kcal · '+r1(cf.p)+'P · '+r1(cf.c)+'C · '+r1(cf.f)+'F</div></div>'
+      +'<div class="note-muted" style="font-size:11px">'+Math.round(cf.k)+' kcal · '+r1(cf.p)+'P · '+r1(cf.c)+'C · '+r1(cf.f)+'F'+(cf.na?' · '+Math.round(cf.na)+'mg Na':'')+'</div></div>'
       +'<div style="display:flex;gap:4px;flex-shrink:0"><button class="chip" onclick="App.editCustomFoodStart(\''+cf.id+'\')">Edit</button>'
       +'<button class="x" onclick="App.deleteCustomFoodConfirm(\''+cf.id+'\')">×</button></div></div>';
   }).join("")+'</div>';
@@ -1357,7 +1391,7 @@ function viewTrain(){
   if(state.trainEx==null || !allNames.includes(state.trainEx)) state.trainEx=names[0]||customNames[0]||null;
   const exObj=day.exercises.find(e=>e.name===state.trainEx);
   const selectedExIsCustom=!names.includes(state.trainEx) && customNames.includes(state.trainEx);
-  const hasAnyEx=names.length || customNames.length;
+  const hasAnyEx=EXLIB.length>0 || customNames.length>0;
   const today=state.wlog.filter(s=>s.date===state.viewDate);
   const dayWord=state.viewDate===TODAY?"today":prettyDate(state.viewDate);
 
@@ -1398,8 +1432,8 @@ function trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyE
   } else {
     const cid=(state.customExercises.find(e=>e.n===state.trainEx)||{}).id;
     exPart=hasAnyEx
-      ? '<div class="field" style="margin-top:6px"><input id="exPick" list="exlist" autocomplete="off" value="'+esc(state.trainEx||"")+'" placeholder="Search exercises…" onchange="App.pickEx(this.value)"></div>'
-        +exDatalist(names,customNames)
+      ? '<div class="field" style="margin-top:6px"><input id="exPick" list="exliblist" autocomplete="off" value="'+esc(state.trainEx||"")+'" placeholder="Search exercises…" onchange="App.pickEx(this.value)"></div>'
+        +exLibDatalist()
         +(exObj?'<div class="hint">Target · '+esc(exObj.sets)+' × '+esc(exObj.reps)+'</div>':'')
         +(selectedExIsCustom?'<button onclick="App.delCustomExercise(\''+cid+'\')" style="background:none;color:var(--muted);font-size:12px;text-decoration:underline;text-align:left;margin-top:6px">Remove “'+esc(state.trainEx)+'” from My Exercises</button>':'')
       : '<div style="color:var(--muted);font-size:14px;margin-top:6px">No exercises here — add them in Plan, or use Custom above.</div>';
@@ -1500,15 +1534,10 @@ function foodDatalist(){
   FOODS.forEach(x=>{ if(!seen[x.n]){ seen[x.n]=1; names.push(x.n); } });
   return '<datalist id="foodlist">'+names.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
 }
-function exDatalist(names, customNames){
-  const seen={}; let out=[];
-  (names||[]).concat(customNames||[]).forEach(n=>{ if(n&&!seen[n]){ seen[n]=1; out.push(n); } });
-  return '<datalist id="exlist">'+out.map(n=>'<option value="'+esc(n)+'"></option>').join("")+'</datalist>';
-}
 function viewEat(){
   const today=state.flog.filter(e=>e.date===state.viewDate);
   const dayWord=state.viewDate===TODAY?"today":prettyDate(state.viewDate);
-  const tot=today.reduce((a,e)=>({p:a.p+e.p,c:a.c+e.c,f:a.f+e.f,s:a.s+e.s,sa:a.sa+e.sa,k:a.k+e.k}),{p:0,c:0,f:0,s:0,sa:0,k:0});
+  const tot=today.reduce((a,e)=>({p:a.p+e.p,c:a.c+e.c,f:a.f+e.f,s:a.s+e.s,sa:a.sa+e.sa,k:a.k+e.k,na:a.na+(e.na||0)}),{p:0,c:0,f:0,s:0,sa:0,k:0,na:0});
   if(!state.eatFood) state.eatFood=FOODS[0].n;
   const fo=resolveFood(state.eatFood);
   const selectedIsCustom = !!(fo && fo.custom);
@@ -1533,6 +1562,7 @@ function viewEat(){
   return '<div class="stack">'
     + banner("Nutrition","栄養ゲージ")
     + '<section>'+dateStepper()+'</section>'
+    + (today.length ? remainingStrip(tot) : '')
     + mealPlanPanel()
     + '<section class="card stack-sm">'
     +   '<div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">'+(state.viewDate===TODAY?"Today":esc(prettyDate(state.viewDate)))+' vs target</div>'
@@ -1541,8 +1571,8 @@ function viewEat(){
     +   macroBar("Carbs g",tot.c,TARGETS.c,false)
     +   macroBar("Fat g",tot.f,TARGETS.f,false)
     +   macroBar("Energy kcal",tot.k,TARGETS.k,false)
-    +   '<div class="row2" style="padding-top:4px">'
-    +     miniLimit("Sugars",tot.s,TARGETS.s)+miniLimit("Sat fat",tot.sa,TARGETS.sa)+'</div>'
+    +   '<div class="row3" style="padding-top:4px">'
+    +     miniLimit("Sugars",tot.s,TARGETS.s)+miniLimit("Sat fat",tot.sa,TARGETS.sa)+miniLimit("Sodium mg",tot.na,TARGETS.na)+'</div>'
     + '</section>'
     + fixupCard()
     + eatFoodCard(fo, selectedIsCustom)
@@ -1571,6 +1601,7 @@ function eatFoodCard(fo, selectedIsCustom){
       +'<div><div class="label">Fat g</div><div class="field" style="margin-top:6px"><input id="cF" class="inp-num" inputmode="decimal" placeholder="20"></div></div></div>'
       +'<div class="row2"><div><div class="label">Sugar g <span style="color:var(--muted);font-weight:400">(optional)</span></div><div class="field" style="margin-top:6px"><input id="cS" class="inp-num" inputmode="decimal" placeholder="0"></div></div>'
       +'<div><div class="label">Sat fat g <span style="color:var(--muted);font-weight:400">(optional)</span></div><div class="field" style="margin-top:6px"><input id="cSat" class="inp-num" inputmode="decimal" placeholder="0"></div></div></div>'
+      +'<div><div class="label">Sodium mg <span style="color:var(--muted);font-weight:400">(optional · 食塩 g × 393)</span></div><div class="field" style="margin-top:6px"><input id="cNa" class="inp-num" inputmode="decimal" placeholder="0"></div></div>'
       +'<div style="font-size:11px;color:var(--muted)">Leave calories blank to auto-calc from P/C/F.</div>'
       +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)"><input type="checkbox" id="cSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Also save to My Foods for next time</label>'
       +'<button class="btn" onclick="App.addCustom()">+ Add to '+state.eatMeal+'</button>';
@@ -1596,6 +1627,19 @@ function miniLimit(label,eaten,target){ const over=eaten>target;
   return '<div style="background:var(--panel2);border:1px solid '+(over?'var(--red)':'var(--line)')+';border-radius:12px;padding:8px 12px;display:flex;align-items:baseline;justify-content:space-between">'
     +'<div class="label">'+label+'</div><div class="mono" style="font-size:13px;font-weight:700;color:'+(over?'var(--red)':'var(--green)')+'">'+Math.round(eaten)
     +'<span style="color:var(--muted);font-weight:400">/'+target+'</span></div></div>';
+}
+function remainingStrip(tot){
+  // Only meaningful once something's been logged for the day
+  const cell=(lbl,left,unit)=>{ const over=left<0; const col=over?'var(--red)':(left<=0?'var(--muted)':'var(--text)');
+    return '<div style="flex:1;text-align:center;min-width:0">'
+      +'<div class="mono" style="font-size:15px;font-weight:800;color:'+col+';line-height:1.1">'+(over?'+'+Math.round(-left):Math.round(left))+'</div>'
+      +'<div class="label" style="font-size:9px;letter-spacing:.06em">'+lbl+(over?' OVER':'')+'</div></div>'; };
+  return '<section class="card" style="padding:10px 12px">'
+    +'<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">'
+    +'<div class="label">Left today</div><div class="note-muted" style="font-size:10px">to hit target</div></div>'
+    +'<div style="display:flex;gap:6px">'
+    + cell('KCAL', TARGETS.k-tot.k) + cell('P', TARGETS.p-tot.p) + cell('C', TARGETS.c-tot.c) + cell('F', TARGETS.f-tot.f)
+    +'</div></section>';
 }
 
 function viewBody(){
