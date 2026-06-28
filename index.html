@@ -560,7 +560,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v25";
+const APP_VERSION = "v26";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -602,7 +602,7 @@ const state = {
 };
 save(K.p, state.plan); // lock in default on first run
 
-function applyTargets(){ TARGETS = (state.profile && state.profile.targets) ? state.profile.targets : DEFAULT_TARGETS; }
+function applyTargets(){ const t=(state.profile && state.profile.targets) ? state.profile.targets : DEFAULT_TARGETS; TARGETS = Object.assign({}, DEFAULT_TARGETS, t); }
 applyTargets();
 function isFreshUser(){
   return !state.profile && state.wlog.length===0 && state.flog.length===0 && state.blog.length===0
@@ -1387,7 +1387,7 @@ function viewTrain(){
   const day=App.currentDay();
   const names=day.exercises.map(e=>e.name).filter(Boolean);
   const customNames=state.customExercises.map(e=>e.n);
-  const allNames=names.concat(customNames);
+  const allNames=names.concat(customNames).concat(EXLIB.map(e=>e.n));
   if(state.trainEx==null || !allNames.includes(state.trainEx)) state.trainEx=names[0]||customNames[0]||null;
   const exObj=day.exercises.find(e=>e.name===state.trainEx);
   const selectedExIsCustom=!names.includes(state.trainEx) && customNames.includes(state.trainEx);
