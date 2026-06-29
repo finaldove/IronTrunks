@@ -71,7 +71,8 @@
 
   .field{ background:#0a0709; border:1px solid var(--line); padding:10px 12px; }
   .field input, .field select{ background:transparent; color:var(--text); border:none; outline:none; width:100%; font-size:15px; }
-  .inp-num{ font-family:var(--mono); font-size:18px; font-weight:700; color:var(--text); }
+  .inp-num{ font-family:var(--mono); font-size:18px; font-weight:700; color:var(--text); background:#0a0709; border:1px solid var(--line); border-radius:0; padding:8px 10px; outline:none; }
+  .field .inp-num{ background:transparent; border:none; padding:0; }
   .field input::placeholder, .inp-num::placeholder, input::placeholder{ color:var(--muted); opacity:.55; font-weight:600; }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
   .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
@@ -561,7 +562,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v36";
+const APP_VERSION = "v37";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -1391,9 +1392,9 @@ function planExCard(day, ex){
     let rows="";
     for(let i=0;i<tgtSets;i++){
       rows+='<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span class="mono" style="font-size:11px;color:var(--muted);width:26px">S'+(i+1)+'</span>'
-        +'<input id="psw_'+ex.id+'_'+i+'" class="inp-num" inputmode="decimal" placeholder="'+wph+'" value="" style="flex:1">'
+        +'<div class="field" style="flex:1;padding:8px 10px"><input id="psw_'+ex.id+'_'+i+'" class="inp-num" inputmode="decimal" placeholder="'+wph+'" value=""></div>'
         +'<span class="mono" style="font-size:12px;color:var(--muted)">×</span>'
-        +'<input id="psr_'+ex.id+'_'+i+'" class="inp-num" inputmode="numeric" placeholder="'+rph+'" value="'+(tgtReps!==""?tgtReps:"")+'" style="flex:1"></div>';
+        +'<div class="field" style="flex:1;padding:8px 10px"><input id="psr_'+ex.id+'_'+i+'" class="inp-num" inputmode="numeric" placeholder="'+rph+'" value="'+(tgtReps!==""?tgtReps:"")+'"></div></div>';
     }
     bodyHtml=rows
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">'
