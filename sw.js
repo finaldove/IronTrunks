@@ -1,5 +1,5 @@
 /* IronTrunks service worker — offline app shell cache */
-const CACHE = "irontrunks-v28";
+const CACHE = "irontrunks-v30";
 const ASSETS = [
   "./",
   "./index.html",
