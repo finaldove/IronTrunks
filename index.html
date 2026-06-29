@@ -15,9 +15,9 @@
   @font-face{ font-family:"IronDisp"; src:url("./display.woff") format("woff"); font-weight:400 900; font-style:normal; font-display:swap; }
   :root{
     --ink:#0C0A0D; --panel:#15111A; --panel2:#1E1722; --line:#3C2E36;
-    --teal:#E51D34; --tealdim:#F1B23E; --text:#EDE6D6; --muted:#9C8F86;
+    --teal:#9A7BD0; --tealdim:#F1B23E; --text:#EDE6D6; --muted:#9C8F86;
     --amber:#F1B23E; --red:#FF5563; --green:#5BD46A;
-    --gold:#F1B23E; --crimson:#E51D34; --crimson-deep:#8E1020;
+    --gold:#F1B23E; --crimson:#7558B6; --crimson-deep:#4A3577;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --disp: "IronDisp","Arial Black",Roboto,sans-serif;
   }
@@ -25,7 +25,7 @@
   html,body{ margin:0; padding:0; background:#000; color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
   body{ max-width:480px; margin:0 auto; min-height:100vh;
-    background:radial-gradient(120% 80% at 50% -8%, #1c0d12 0%, var(--ink) 55%), var(--ink); }
+    background:radial-gradient(120% 80% at 50% -8%, #1C1424 0%, var(--ink) 55%), var(--ink); }
   body::after{ content:""; position:fixed; inset:0; pointer-events:none; z-index:60;
     background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.14) 2px 3px); mix-blend-mode:multiply; }
   body::before{ content:""; position:fixed; inset:0; pointer-events:none; z-index:59;
@@ -39,8 +39,8 @@
   .brand{ display:flex; align-items:center; gap:11px; }
   .seal{ flex:0 0 auto; width:44px; height:44px; border-radius:50%; display:grid; place-items:center;
     color:var(--text); font-size:23px; font-weight:700; transform:rotate(-6deg);
-    background:radial-gradient(circle at 35% 30%, #c0162a, #7c0d1c); border:2px solid var(--gold);
-    box-shadow:0 0 13px rgba(229,29,52,.5), inset 0 0 8px rgba(0,0,0,.5); text-shadow:0 1px 2px rgba(0,0,0,.6); }
+    background:radial-gradient(circle at 35% 30%, #8866C9, #3B2A5E); border:2px solid var(--gold);
+    box-shadow:0 0 13px rgba(154,123,208,.5), inset 0 0 8px rgba(0,0,0,.5); text-shadow:0 1px 2px rgba(0,0,0,.6); }
   .logo{ font-family:var(--disp); font-weight:900; font-size:26px; line-height:.9; transform:skewX(-8deg);
     letter-spacing:-.01em; text-transform:uppercase; color:var(--text);
     text-shadow:2px 2px 0 var(--crimson-deep), 4px 4px 0 rgba(0,0,0,.4); }
@@ -84,9 +84,9 @@
     box-shadow:0 0 12px rgba(241,178,62,.45); }
 
   .btn{ position:relative; width:100%; padding:14px; font-family:var(--disp); font-weight:900; font-size:16px;
-    text-transform:uppercase; letter-spacing:.04em; color:#190a0a; overflow:hidden;
-    background:linear-gradient(180deg,#ff3144,var(--crimson) 40%,#a81223); border:2px solid var(--gold);
-    box-shadow:0 0 16px rgba(229,29,52,.45), inset 0 2px 0 rgba(255,255,255,.22);
+    text-transform:uppercase; letter-spacing:.04em; color:#160F1F; overflow:hidden;
+    background:linear-gradient(180deg,#C9AEEF,var(--crimson) 40%,#3B2A5E); border:2px solid var(--gold);
+    box-shadow:0 0 16px rgba(154,123,208,.45), inset 0 2px 0 rgba(255,255,255,.22);
     display:flex; align-items:center; justify-content:center; gap:8px;
     clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
   .btn::after{ content:""; position:absolute; inset:0; pointer-events:none;
@@ -125,7 +125,7 @@
   .bars{ display:flex; align-items:flex-end; gap:10px; height:140px; padding-top:8px; }
   .barcol{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
   .bar{ width:100%; max-width:38px; background:linear-gradient(180deg, var(--gold), var(--crimson)); min-height:2px;
-    box-shadow:0 0 8px rgba(229,29,52,.4); }
+    box-shadow:0 0 8px rgba(154,123,208,.4); }
   .barlabel{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-family:var(--mono); }
   .barval{ font-family:var(--mono); font-size:11px; color:var(--gold); font-weight:700; }
 
@@ -560,7 +560,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v27";
+const APP_VERSION = "v28";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
