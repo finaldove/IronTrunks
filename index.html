@@ -460,7 +460,7 @@ function quickAddCard(){
 
 function E(name, sets, reps){ return { id:uid(), name, sets, reps }; }
 /* ---------- workout program generator ---------- */
-const MUSCLES = ["chest","back","shoulders","biceps","triceps","quads","hamstrings","glutes","calves","core"];
+const MUSCLES = ["chest","back","shoulders","biceps","triceps","forearms","quads","hamstrings","glutes","calves","core"];
 const EXLIB = [
   /* [name, muscle, equip, pattern, level(1-3), kind C/A] */
   ["Barbell Bench Press","chest","barbell","horiz_push",2,"C"],["Dumbbell Bench Press","chest","dumbbell","horiz_push",1,"C"],
@@ -482,10 +482,11 @@ const EXLIB = [
   ["Romanian Deadlift","hamstrings","barbell","hinge",2,"C"],["Dumbbell RDL","hamstrings","dumbbell","hinge",1,"C"],["Deadlift","hamstrings","barbell","hinge",3,"C"],
   ["Leg Curl","hamstrings","machine","ham",1,"A"],["Cable Pull-through","hamstrings","cable","hinge",1,"A"],["Nordic Curl","hamstrings","bodyweight","ham",3,"A"],
   ["Hip Thrust","glutes","barbell","glute",2,"C"],["Dumbbell Hip Thrust","glutes","dumbbell","glute",1,"A"],["Glute Bridge","glutes","bodyweight","glute",1,"A"],["Cable Glute Kickback","glutes","cable","glute",1,"A"],
-  ["Standing Calf Raise","calves","machine","calf",1,"A"],["Dumbbell Calf Raise","calves","dumbbell","calf",1,"A"],["Bodyweight Calf Raise","calves","bodyweight","calf",1,"A"],
+  ["Calf Raise","calves","machine","calf",1,"A"],
   ["Barbell Curl","biceps","barbell","curl",1,"A"],["Dumbbell Curl","biceps","dumbbell","curl",1,"A"],["Hammer Curl","biceps","dumbbell","curl",1,"A"],["Cable Curl","biceps","cable","curl",1,"A"],
   ["Cable Triceps Pushdown","triceps","cable","ext",1,"A"],["Overhead Dumbbell Extension","triceps","dumbbell","ext",1,"A"],["Close-Grip Bench Press","triceps","barbell","ext",2,"C"],
   ["Bench Dips","triceps","bodyweight","ext",1,"A"],["Skullcrusher","triceps","barbell","ext",2,"A"],
+  ["Wrist Curl","forearms","dumbbell","curl",1,"A"],["Reverse Wrist Curl","forearms","dumbbell","curl",1,"A"],
   ["Hanging Leg Raise","core","bodyweight","core",2,"A"],["Plank","core","bodyweight","core",1,"A",true],["Cable Crunch","core","cable","core",1,"A"],["Cable Woodchop","core","cable","core",1,"A"],["Ab Wheel","core","bodyweight","core",2,"A"],
   /* extra bodyweight + yoga/pilates */
   ["Incline Push-up","chest","bodyweight","horiz_push",1,"C"],["Diamond Push-up","triceps","bodyweight","ext",2,"A"],
@@ -592,7 +593,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v40";
+const APP_VERSION = "v41";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -1287,7 +1288,7 @@ function myFoodsCard(){
 function myExercisesCard(){
   const list=state.customExercises;
   if(!list.length) return '<div class="note-muted">No custom exercises saved yet. They\'ll appear here once you save one from Train → Log off-plan → Custom.</div>';
-  const muscleName=m=>({chest:"Chest",back:"Back",shoulders:"Shoulders",biceps:"Biceps",triceps:"Triceps",quads:"Quads",hamstrings:"Hamstrings",glutes:"Glutes",calves:"Calves",core:"Core"}[m]||"");
+  const muscleName=m=>({chest:"Chest",back:"Back",shoulders:"Shoulders",biceps:"Biceps",triceps:"Triceps",forearms:"Forearms",quads:"Quads",hamstrings:"Hamstrings",glutes:"Glutes",calves:"Calves",core:"Core"}[m]||"");
   return '<div class="stack-sm">'+list.map(ce=>{
     const editing=state.editCustomExId===ce.id;
     if(editing){
@@ -1890,7 +1891,7 @@ function viewStats(){
   const byMus={}; recent.forEach(s=>{ const m=muscleOf(s.exercise); byMus[m]=(byMus[m]||0)+1; });
   const musOrder=MUSCLES.concat(["other"]).filter(m=>byMus[m]);
   const maxM=musOrder.length?Math.max.apply(null,musOrder.map(m=>byMus[m])):0;
-  const musLabel={chest:"Chest",back:"Back",shoulders:"Delts",biceps:"Bi",triceps:"Tri",quads:"Quad",hamstrings:"Ham",glutes:"Glute",calves:"Calf",core:"Core",other:"Other"};
+  const musLabel={chest:"Chest",back:"Back",shoulders:"Delts",biceps:"Bi",triceps:"Tri",forearms:"Fore",quads:"Quad",hamstrings:"Ham",glutes:"Glute",calves:"Calf",core:"Core",other:"Other"};
   let musBars = musOrder.length===0 ? emptyBox("Log a few sets to see your muscle split.")
     : '<div class="bars">'+musOrder.map(m=>{ const h=Math.round((byMus[m]/maxM)*120);
         return '<div class="barcol"><div class="barval">'+byMus[m]+'</div><div class="bar" style="height:'+h+'px"></div><div class="barlabel">'+esc(musLabel[m]||m)+'</div></div>';
