@@ -460,6 +460,7 @@ function quickAddCard(){
 
 function E(name, sets, reps){ return { id:uid(), name, sets, reps }; }
 /* ---------- workout program generator ---------- */
+const MUSCLES = ["chest","back","shoulders","biceps","triceps","quads","hamstrings","glutes","calves","core"];
 const EXLIB = [
   /* [name, muscle, equip, pattern, level(1-3), kind C/A] */
   ["Barbell Bench Press","chest","barbell","horiz_push",2,"C"],["Dumbbell Bench Press","chest","dumbbell","horiz_push",1,"C"],
@@ -497,6 +498,13 @@ const EXLIB = [
   ["Hollow Body Hold","core","bodyweight","core",2,"A",true],["Side Plank","core","bodyweight","core",1,"A",true],["Boat Pose","core","bodyweight","core",2,"A",true],["L-Sit Hold","core","bodyweight","core",3,"A",true],
   ["Dead Bug","core","bodyweight","core",1,"A"],["Bird Dog","core","bodyweight","core",1,"A"],["Mountain Climbers","core","bodyweight","core",1,"A"]
 ].map(a=>({n:a[0],mus:a[1],eq:a[2],pat:a[3],lv:a[4],kind:a[5],iso:a[6]||false}));
+const EXLIB_MUSCLE = Object.fromEntries(EXLIB.map(e=>[e.n, e.mus]));
+function muscleOf(exName){
+  if(EXLIB_MUSCLE[exName]) return EXLIB_MUSCLE[exName];
+  const cf=state.customExercises.find(x=>x.n===exName);
+  if(cf && cf.muscle) return cf.muscle;
+  return "other";
+}
 
 const SPLITS={
   3:["FULL","cond","FULL","rest","FULL","cond","rest"],
@@ -562,7 +570,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v37";
+const APP_VERSION = "v39";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -589,11 +597,12 @@ const state = {
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
   viewDate:TODAY, editFood:null, editFoodMode:"serving", editSet:null,
-  expand:{plan:false, quick:false}, fixFood:null, perSet:{}, planEdit:false, planNewFood:null, planCollapsed:{},
+  expand:{plan:false, quick:false}, fixFood:null, perSet:{}, planEdit:false, planNewFood:null, planCollapsed:{}, statVolMode:"day",
   mealPrefs:{meals:"4", protein:"mixed", treat:"yes"}, mealPrefsOpen:false,
   meta: load(K.meta, {}),
   customFoods: load(K.cf, []),
   editCustomFoodId: null,
+  editCustomExId: null,
   customExercises: load(K.ce, []),
   profile: load(K.pr, null),
   mealPlan: load(K.mp, null),
@@ -789,15 +798,32 @@ const App = {
     const w=wv===""||wv==null?0:parseFloat(wv);
     const rp=parseInt(document.getElementById("tr").value,10);
     const saveIt=document.getElementById("cExSave").checked;
+    const muscle=(document.getElementById("cExMuscle")||{}).value||"";
     if(!name || !(w>=0) || !(rp>0)){ toast("Enter exercise & reps"); return; }
     state.wlog.push({ id:uid(), date:state.viewDate, day:d.name, focus:d.focus, exercise:name, weight:w, reps:rp });
     save(K.w,state.wlog);
     if(saveIt && !state.customExercises.some(x=>x.n.toLowerCase()===name.toLowerCase())){
-      state.customExercises.push({ id:uid(), n:name }); save(K.ce,state.customExercises);
+      state.customExercises.push({ id:uid(), n:name, muscle:muscle }); save(K.ce,state.customExercises);
     }
     toast(saveIt?"Logged & saved":"Set logged"); render();
   },
   delCustomExercise(id){ state.customExercises=state.customExercises.filter(x=>x.id!==id); save(K.ce,state.customExercises); render(); },
+  editCustomExStart(id){ state.editCustomExId=id; render(); },
+  editCustomExCancel(){ state.editCustomExId=null; render(); },
+  editCustomExSave(id){
+    const ce=state.customExercises.find(x=>x.id===id); if(!ce) return;
+    const name=(document.getElementById("ece_name_"+id).value||"").trim();
+    const muscle=(document.getElementById("ece_mus_"+id)||{}).value||"";
+    if(!name){ toast("Name can't be empty"); return; }
+    Object.assign(ce,{n:name,muscle:muscle});
+    save(K.ce,state.customExercises); state.editCustomExId=null;
+    toast("Updated \""+name+"\""); render();
+  },
+  deleteCustomExConfirm(id){
+    const ce=state.customExercises.find(x=>x.id===id); if(!ce) return;
+    if(!confirm('Delete "'+ce.n+'" from My Exercises? Already-logged sets keep their data and won\'t be affected.')) return;
+    App.delCustomExercise(id);
+  },
 
   /* ---- PLAN ---- */
   savePlanSoon(){ if(App._pt) clearTimeout(App._pt); App._pt=setTimeout(()=>save(K.p,state.plan),400); },
@@ -813,6 +839,7 @@ const App = {
   setType(did,type){ const d=state.plan.find(x=>x.id===did); if(d){ d.type=type; save(K.p,state.plan); render(); } },
   addDay(){ const n=state.plan.length+1; state.plan.push({ id:uid(), name:"Day "+n, focus:"", type:"lift", note:"", exercises:[] }); App.markTrain(); save(K.p,state.plan); render(); },
   togglePlanDay(id){ state.planCollapsed[id]=!state.planCollapsed[id]; render(); },
+  setStatVolMode(m){ state.statVolMode=m; render(); },
   collapseAllDays(){ state.plan.forEach(d=>state.planCollapsed[d.id]=true); render(); },
   expandAllDays(){ state.planCollapsed={}; render(); },
   delDay(id){ if(!confirm("Delete this day? Logged sets are not affected.")) return; state.plan=state.plan.filter(d=>d.id!==id); if(state.trainDay===id) state.trainDay=null; save(K.p,state.plan); render(); },
@@ -1235,6 +1262,33 @@ function myFoodsCard(){
       +'<button class="x" onclick="App.deleteCustomFoodConfirm(\''+cf.id+'\')">×</button></div></div>';
   }).join("")+'</div>';
 }
+function myExercisesCard(){
+  const list=state.customExercises;
+  if(!list.length) return '<div class="note-muted">No custom exercises saved yet. They\'ll appear here once you save one from Train → Log off-plan → Custom.</div>';
+  const muscleName=m=>({chest:"Chest",back:"Back",shoulders:"Shoulders",biceps:"Biceps",triceps:"Triceps",quads:"Quads",hamstrings:"Hamstrings",glutes:"Glutes",calves:"Calves",core:"Core"}[m]||"");
+  return '<div class="stack-sm">'+list.map(ce=>{
+    const editing=state.editCustomExId===ce.id;
+    if(editing){
+      return '<div class="item" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px">'
+        +'<div class="field"><input id="ece_name_'+ce.id+'" value="'+esc(ce.n)+'" placeholder="Exercise name"></div>'
+        +'<div><div class="label">Target muscle <span style="color:var(--muted);font-weight:400">(optional)</span></div>'
+        +'<div class="field" style="margin-top:4px"><select id="ece_mus_'+ce.id+'">'
+          +'<option value="">— none —</option>'
+          +MUSCLES.map(m=>'<option value="'+m+'"'+((ce.muscle||"")===m?' selected':'')+'>'+muscleName(m)+'</option>').join("")
+        +'</select></div></div>'
+        +'<div class="note-muted" style="font-size:11px">Tagging a muscle includes this exercise in your Sets-by-muscle breakdown on the Stats tab. Applies to all its logged sets, past and future.</div>'
+        +'<div class="row2"><button class="btn small" onclick="App.editCustomExSave(\''+ce.id+'\')">Save</button>'
+        +'<button class="btn small ghost" style="color:var(--text)" onclick="App.editCustomExCancel()">Cancel</button></div>'
+        +'</div>';
+    }
+    const tag=ce.muscle?muscleName(ce.muscle):"No muscle tag";
+    return '<div class="item" style="padding:9px 10px">'
+      +'<div class="min0"><div class="truncate" style="font-weight:600">'+esc(ce.n)+'</div>'
+      +'<div class="note-muted" style="font-size:11px;color:'+(ce.muscle?"var(--teal)":"var(--muted)")+'">'+esc(tag)+'</div></div>'
+      +'<div style="display:flex;gap:4px;flex-shrink:0"><button class="chip" onclick="App.editCustomExStart(\''+ce.id+'\')">Edit</button>'
+      +'<button class="x" onclick="App.deleteCustomExConfirm(\''+ce.id+'\')">×</button></div></div>';
+  }).join("")+'</div>';
+}
 function emptyBox(t){ return '<div class="empty">'+esc(t)+'</div>'; }
 function dateStepper(){
   const isToday=state.viewDate===TODAY;
@@ -1448,6 +1502,7 @@ function viewTrain(){
     + '<div style="margin-top:8px;font-size:13px;color:var(--muted)">'+esc(day.focus)+'</div></section>'
     + (planCards || emptyBox("No exercises in this day — add them in Plan, or log off-plan below."))
     + expander('offplan','＋ Log something off-plan','Search any exercise, or add a custom one', ()=>trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyEx))
+    + expander('myexercises', 'My Exercises ('+state.customExercises.length+')', 'Edit names or tag a target muscle', myExercisesCard)
     + '<section><div style="display:flex;align-items:baseline;justify-content:space-between"><div class="label">Logged '+esc(dayWord)+'</div>'
     +   '<div class="mono" style="font-size:12px;color:var(--muted)">'+today.length+' sets</div></div>'+list+'</section>'
     + '</div>';
@@ -1461,6 +1516,12 @@ function trainExCard(day, names, customNames, exObj, selectedExIsCustom, hasAnyE
   let exPart;
   if(state.trainMode==="custom"){
     exPart='<div class="field" style="margin-top:6px"><input id="cExName" value="'+esc(state.trainCustomName||"")+'" placeholder="e.g. Cable Crossover" oninput="App.setTrainCustomName(this.value)"></div>'
+      +'<div style="margin-top:8px"><div class="label">Target muscle <span style="color:var(--muted);font-weight:400">(optional)</span></div>'
+      +'<div class="field" style="margin-top:4px"><select id="cExMuscle">'
+        +'<option value="">— none —</option>'
+        +MUSCLES.map(m=>'<option value="'+m+'">'+m.charAt(0).toUpperCase()+m.slice(1)+'</option>').join("")
+      +'</select></div></div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:4px">Tagging a muscle lets it show up in your Sets-by-muscle breakdown on the Stats tab.</div>'
       +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-top:8px"><input type="checkbox" id="cExSave" style="width:16px;height:16px;accent-color:#2DD4BF"> Save to My Exercises for next time</label>';
   } else {
     const cid=(state.customExercises.find(e=>e.n===state.trainEx)||{}).id;
@@ -1803,6 +1864,17 @@ function viewStats(){
         return '<div class="barcol"><div class="barval">'+by[d]+'</div><div class="bar" style="height:'+h+'px"></div><div class="barlabel">'+esc(d.replace("Day ","D"))+'</div></div>';
       }).join("")+'</div>';
 
+  // sets by muscle (primary muscle, full-set credit)
+  const byMus={}; recent.forEach(s=>{ const m=muscleOf(s.exercise); byMus[m]=(byMus[m]||0)+1; });
+  const musOrder=MUSCLES.concat(["other"]).filter(m=>byMus[m]);
+  const maxM=musOrder.length?Math.max.apply(null,musOrder.map(m=>byMus[m])):0;
+  const musLabel={chest:"Chest",back:"Back",shoulders:"Delts",biceps:"Bi",triceps:"Tri",quads:"Quad",hamstrings:"Ham",glutes:"Glute",calves:"Calf",core:"Core",other:"Other"};
+  let musBars = musOrder.length===0 ? emptyBox("Log a few sets to see your muscle split.")
+    : '<div class="bars">'+musOrder.map(m=>{ const h=Math.round((byMus[m]/maxM)*120);
+        return '<div class="barcol"><div class="barval">'+byMus[m]+'</div><div class="bar" style="height:'+h+'px"></div><div class="barlabel">'+esc(musLabel[m]||m)+'</div></div>';
+      }).join("")+'</div>';
+  const hasOther = !!byMus.other;
+
   const g=goalStats();
   let goalCard;
   if(g.gw==null){
@@ -1851,7 +1923,13 @@ function viewStats(){
     + goalCard
     + adCard
     + '<section class="card"><div class="label">Weight trend · kg & 7-day avg</div><div style="margin-top:8px">'+weightSVG()+'</div></section>'
-    + '<section class="card"><div class="label">Weekly volume · sets by day</div>'+bars+'</section>'
+    + '<section class="card stack-sm">'
+    +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+    +     '<div class="label">Weekly volume · '+(state.statVolMode==="muscle"?"sets by muscle":"sets by day")+'</div>'
+    +     '<div class="seg"><button style="'+(state.statVolMode==="day"?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.setStatVolMode(\'day\')">By day</button><button style="'+(state.statVolMode==="muscle"?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.setStatVolMode(\'muscle\')">By muscle</button></div>'
+    +   '</div>'
+    +   (state.statVolMode==="muscle" ? musBars + (hasOther?'<div class="note-muted" style="font-size:11px">"Other" = custom or off-plan lifts with no muscle tag. Tag them when logging a custom exercise to sort them here.</div>':'') : bars)
+    + '</section>'
     + '<section class="card stack-sm"><div class="label">Settings</div>'
     +   '<div class="note-muted">Targets · '+TARGETS.k+' kcal · '+TARGETS.p+'P / '+TARGETS.c+'C / '+TARGETS.f+'F</div>'
     +   '<button class="btn ghost small" style="color:var(--text)" onclick="App.openSetup()">'+(state.profile?'Recalculate targets':'Set up targets')+'</button>'
