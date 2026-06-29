@@ -499,10 +499,32 @@ const EXLIB = [
   ["Dead Bug","core","bodyweight","core",1,"A"],["Bird Dog","core","bodyweight","core",1,"A"],["Mountain Climbers","core","bodyweight","core",1,"A"]
 ].map(a=>({n:a[0],mus:a[1],eq:a[2],pat:a[3],lv:a[4],kind:a[5],iso:a[6]||false}));
 const EXLIB_MUSCLE = Object.fromEntries(EXLIB.map(e=>[e.n, e.mus]));
+function exNormKey(name){
+  return String(name==null?"":name).toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu," ")
+    .split(/\s+/).filter(Boolean)
+    .map(function(w){ // light singularize so plural/spelling variants match
+      if(w.length>3 && /ies$/.test(w)) return w.slice(0,-3)+"y";   // flies->fly
+      if(w.length>3 && /yes$/.test(w)) return w.slice(0,-2);        // flyes->fly
+      if(w.length>4 && /(ss|x|z|ch|sh)es$/.test(w)) return w.slice(0,-2); // presses->press, boxes->box
+      if(w.length>2 && /s$/.test(w) && !/ss$/.test(w)) return w.slice(0,-1); // raises->raise, ups->up, curls->curl
+      return w;
+    })
+    .sort().join(" ");
+}
+const EXLIB_MUSCLE_NORM = (function(){ var cnt={}, last={};
+  EXLIB.forEach(function(e){ var k=exNormKey(e.n); if(!k) return; cnt[k]=(cnt[k]||0)+1; last[k]=e.mus; });
+  var out={}; Object.keys(last).forEach(function(k){ if(cnt[k]===1) out[k]=last[k]; }); return out; })();
 function muscleOf(exName){
   if(EXLIB_MUSCLE[exName]) return EXLIB_MUSCLE[exName];
   const cf=state.customExercises.find(x=>x.n===exName);
   if(cf && cf.muscle) return cf.muscle;
+  // normalized fallback: catches spelling/plural variants like "Rear Delt Flyes" -> "Rear Delt Fly"
+  const nk=exNormKey(exName);
+  if(nk && EXLIB_MUSCLE_NORM[nk]) return EXLIB_MUSCLE_NORM[nk];
+  // also match custom exercises by normalized name
+  const cfn=state.customExercises.find(x=>x.muscle && exNormKey(x.n)===nk);
+  if(cfn) return cfn.muscle;
   return "other";
 }
 
@@ -570,7 +592,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v39";
+const APP_VERSION = "v40";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -1928,7 +1950,7 @@ function viewStats(){
     +     '<div class="label">Weekly volume · '+(state.statVolMode==="muscle"?"sets by muscle":"sets by day")+'</div>'
     +     '<div class="seg"><button style="'+(state.statVolMode==="day"?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.setStatVolMode(\'day\')">By day</button><button style="'+(state.statVolMode==="muscle"?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.setStatVolMode(\'muscle\')">By muscle</button></div>'
     +   '</div>'
-    +   (state.statVolMode==="muscle" ? musBars + (hasOther?'<div class="note-muted" style="font-size:11px">"Other" = custom or off-plan lifts with no muscle tag. Tag them when logging a custom exercise to sort them here.</div>':'') : bars)
+    +   (state.statVolMode==="muscle" ? musBars + (hasOther?'<div class="note-muted">"Other" = custom or off-plan lifts with no muscle tag. Tag them when logging a custom exercise to sort them here.</div>':'') : bars)
     + '</section>'
     + '<section class="card stack-sm"><div class="label">Settings</div>'
     +   '<div class="note-muted">Targets · '+TARGETS.k+' kcal · '+TARGETS.p+'P / '+TARGETS.c+'C / '+TARGETS.f+'F</div>'
