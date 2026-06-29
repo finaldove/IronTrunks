@@ -560,7 +560,7 @@ function makeDefaultPlan(){ return []; }
 
 /* ============================== STORAGE ============================== */
 const K = { w:"il.workoutLog", f:"il.foodLog", b:"il.weightLog", p:"il.trainingPlan", cf:"il.customFoods", ce:"il.customExercises", pr:"il.profile", mp:"il.mealPlan", mpl:"il.mealPlans", meta:"il.meta" };
-const APP_VERSION = "v30";
+const APP_VERSION = "v31";
 function load(key, fb){ try{ const v=localStorage.getItem(key); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error("save failed", e); } }
 
@@ -586,7 +586,7 @@ const state = {
   blog: load(K.b, []),
   plan: (function(){ const p=load(K.p, null); return (Array.isArray(p) && p.length) ? p : makeDefaultPlan(); })(),
   trainDay:null, trainEx:null, eatMeal:"Breakfast", eatFood:FOODS[0].n, eatMode:"list", trainMode:"list", trainCustomName:"", parseInput:"", parsed:[],
-  viewDate:TODAY, editFood:null, editSet:null,
+  viewDate:TODAY, editFood:null, editFoodMode:"serving", editSet:null,
   expand:{plan:false, quick:false}, fixFood:null, perSet:{}, planEdit:false, planNewFood:null,
   mealPrefs:{meals:"4", protein:"mixed", treat:"yes"}, mealPrefsOpen:false,
   meta: load(K.meta, {}),
@@ -887,20 +887,27 @@ const App = {
     if(!items.length){ toast("Nothing logged "+prettyDate(prev)); return; }
     items.forEach(e=>state.flog.push(Object.assign({}, e, {id:uid(), date:state.viewDate})));
     save(K.f,state.flog); toast("Copied "+items.length+" item"+(items.length>1?"s":"")+" from "+prettyDate(prev)); render(); },
-  editFoodStart(id){ state.editFood=id; state.editSet=null; render(); },
+  editFoodStart(id){ state.editFood=id; state.editFoodMode="serving"; state.editSet=null; render(); },
+  setEditFoodMode(m){ state.editFoodMode=m; render(); },
   editFoodSave(id){ const e=state.flog.find(x=>x.id===id); if(!e) return;
     const a=parseFloat(document.getElementById("ef_"+id).value);
     if(!(a>0)){ toast("Enter an amount"); return; }
     const fo=resolveFood(e.name);
     if(fo){ const fac=a/fo.q; Object.assign(e,{amount:a,unit:fo.u,p:fo.p*fac,c:fo.c*fac,f:fo.f*fac,s:fo.s*fac,sa:fo.sa*fac,k:fo.k*fac,na:(fo.na||0)*fac}); }
     else { const r=a/(e.amount||1); Object.assign(e,{amount:a,p:e.p*r,c:e.c*r,f:e.f*r,s:e.s*r,sa:e.sa*r,k:e.k*r,na:(e.na||0)*r}); }
-    save(K.f,state.flog); state.editFood=null; toast("Updated"); render(); },
+    save(K.f,state.flog); state.editFood=null; state.editFoodMode="serving"; toast("Updated"); render(); },
+  editFoodSaveMacros(id){ const e=state.flog.find(x=>x.id===id); if(!e) return;
+    const gv=k=>{ const el=document.getElementById(k+"_"+id); return el?(parseFloat(el.value)||0):0; };
+    const p=gv("efm_p"), c=gv("efm_c"), f=gv("efm_f"), s=gv("efm_s"), sa=gv("efm_sa"), na=gv("efm_na");
+    let k=gv("efm_k"); if(!(k>0)) k=Math.round((4*p)+(4*c)+(9*f));
+    Object.assign(e,{p:p,c:c,f:f,s:s,sa:sa,na:na,k:k});
+    save(K.f,state.flog); state.editFood=null; state.editFoodMode="serving"; toast("Updated"); render(); },
   editSetStart(id){ state.editSet=id; state.editFood=null; render(); },
   editSetSave(id){ const s=state.wlog.find(x=>x.id===id); if(!s) return;
     const w=parseFloat(document.getElementById("ew_"+id).value); const rp=parseInt(document.getElementById("er_"+id).value,10);
     if(!(w>=0)||!(rp>0)){ toast("Enter weight & reps"); return; }
     s.weight=w; s.reps=rp; save(K.w,state.wlog); state.editSet=null; toast("Updated"); render(); },
-  editCancel(){ state.editFood=null; state.editSet=null; render(); },
+  editCancel(){ state.editFood=null; state.editFoodMode="serving"; state.editSet=null; render(); },
   dismissGuide(){ state.meta.guideHidden=true; save(K.meta,state.meta); render(); },
   toggleExpand(key){ state.expand[key]=!state.expand[key]; render(); },
   openFix(n){ state.fixFood=state.fixFood===n?null:n; render(); },
@@ -1550,9 +1557,23 @@ function viewEat(){
           +'<div class="mono" style="font-size:11px;color:var(--muted)">'+Math.round(sub.k)+' kcal · '+r1(sub.p)+'P</div></div>'
           +'<div class="stack-sm">'+g.items.slice().reverse().map(e=>
             state.editFood===e.id
-            ? '<div class="item"><div class="min0"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(e.name)+'</div>'
-              +'<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><input id="ef_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.amount)+'" style="max-width:90px"><span class="mono" style="font-size:11px;color:var(--muted)">'+esc(e.unit)+'</span></div></div>'
-              +'<div style="display:flex;align-items:center;gap:6px"><button class="chip on" onclick="App.editFoodSave(\''+e.id+'\')">✓</button><button class="chip" onclick="App.editCancel()">✕</button></div></div>'
+            ? '<div class="item" style="flex-direction:column;align-items:stretch;gap:8px"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(e.name)+'</div>'
+              +'<div class="seg" style="align-self:flex-start"><button style="'+(state.editFoodMode==="serving"?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.setEditFoodMode(\'serving\')">Serving</button><button style="'+(state.editFoodMode==="macros"?"background:var(--teal);color:var(--ink)":"")+'" onclick="App.setEditFoodMode(\'macros\')">Macros</button></div>'
+              +(state.editFoodMode==="serving"
+                ? '<div style="display:flex;align-items:center;gap:10px"><input id="ef_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.amount)+'" style="max-width:110px"><span class="mono" style="font-size:11px;color:var(--muted)">'+esc(e.unit)+'</span>'
+                  +'<div style="flex:1"></div><button class="chip on" onclick="App.editFoodSave(\''+e.id+'\')">✓ Save</button><button class="chip" onclick="App.editCancel()">✕</button></div>'
+                : '<div class="row2">'
+                    +'<div><div class="label">Calories</div><div class="field" style="margin-top:4px"><input id="efm_k_'+e.id+'" class="inp-num" inputmode="decimal" value="'+Math.round(e.k)+'"></div></div>'
+                    +'<div><div class="label">Protein g</div><div class="field" style="margin-top:4px"><input id="efm_p_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.p)+'"></div></div>'
+                    +'<div><div class="label">Carbs g</div><div class="field" style="margin-top:4px"><input id="efm_c_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.c)+'"></div></div>'
+                    +'<div><div class="label">Fat g</div><div class="field" style="margin-top:4px"><input id="efm_f_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.f)+'"></div></div>'
+                    +'<div><div class="label">Sugar g</div><div class="field" style="margin-top:4px"><input id="efm_s_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.s||0)+'"></div></div>'
+                    +'<div><div class="label">Sat fat g</div><div class="field" style="margin-top:4px"><input id="efm_sa_'+e.id+'" class="inp-num" inputmode="decimal" value="'+r1(e.sa||0)+'"></div></div>'
+                    +'<div><div class="label">Sodium mg</div><div class="field" style="margin-top:4px"><input id="efm_na_'+e.id+'" class="inp-num" inputmode="decimal" value="'+Math.round(e.na||0)+'"></div></div>'
+                  +'</div>'
+                  +'<div style="font-size:11px;color:var(--muted)">Leave calories at 0 to auto-calc from P/C/F. These values override this entry only.</div>'
+                  +'<div style="display:flex;gap:6px"><button class="chip on" onclick="App.editFoodSaveMacros(\''+e.id+'\')">✓ Save</button><button class="chip" onclick="App.editCancel()">✕ Cancel</button></div>')
+              +'</div>'
             : '<div class="item"><div class="min0" onclick="App.editFoodStart(\''+e.id+'\')" style="cursor:pointer"><div class="truncate" style="font-weight:600;font-size:14px">'+esc(e.name)+'</div>'
             +'<div class="mono" style="font-size:10.5px;color:var(--muted)">'+r1(e.amount)+' '+esc(e.unit)+' · '+Math.round(e.k)+' kcal · tap to edit</div></div>'
             +'<div style="display:flex;align-items:center;gap:8px"><div class="mono" style="font-size:12px;color:var(--teal);font-weight:700;white-space:nowrap">'+r1(e.p)+'P</div>'
